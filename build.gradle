@@ -23,7 +23,7 @@ tasks.withType(JavaCompile) {
 tasks.withType(Javadoc) { options.encoding = defaultEncoding }
 
 tasks.withType(JavaExec) {
-    environment "LD_LIBRARY_PATH", "$project.buildDir/lib"
+    environment "LD_LIBRARY_PATH", "$project.rootDir/lib"
 }
 
 idea {
@@ -75,7 +75,7 @@ repositories {
 }
 
 dependencies {
-    api files("$project.buildDir/lib/prism.jar")
+    api files("$rootProject.buildDir/lib/prism.jar")
 
     // https://github.com/google/guava
     // api since immutables generated code depends on guava
@@ -107,7 +107,7 @@ test {
 //noinspection GroovyAssignabilityCheck
 task prismJar(type: Jar) {
     archiveFileName = 'prism.jar'
-    destinationDirectory = file("$project.buildDir/lib")
+    destinationDirectory = file("$rootProject.buildDir/lib")
     from "$project.projectDir/lib/prism/prism/src"
     from "$project.projectDir/lib/prism/prism/classes"
     from {
@@ -121,7 +121,7 @@ task prismNatives(type: Copy) {
     from "lib/prism/prism/lib"
     include "*.so"
     include "*.dll"
-    into "$project.buildDir/lib/"
+    into "$rootProject.buildDir/lib/"
 }
 
 task prism {
