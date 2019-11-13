@@ -78,7 +78,8 @@ dependencies {
     api files("$project.buildDir/lib/prism.jar")
 
     // https://github.com/google/guava
-    implementation 'com.google.guava:guava:28.1-jre'
+    // api since immutables generated code depends on guava
+    api 'com.google.guava:guava:28.1-jre'
     // https://github.com/incaseoftrouble/naturals-util
     api 'de.tum.in:naturals-util:0.14.1'
     implementation group: 'com.zaxxer', name: 'SparseBitSet', version: '1.2'
