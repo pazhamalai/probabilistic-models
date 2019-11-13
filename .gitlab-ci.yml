@@ -1,0 +1,30 @@
+# TODO Change to this repo's registry
+image: gitlab.lrz.de:5005/i7/partial-exploration:4add7081
+
+before_script:
+  - chmod +x gradlew
+
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  GRADLE: ./.gradle
+  GRADLE_HOME: $GRADLE
+  GRADLE_USER_HOME: $GRADLE
+
+Build:
+  stage: build
+  script:
+    - java -version
+    - git submodule sync -- lib/prism
+    - git submodule update --init -- lib/prism
+    - (cd lib/prism/prism && make)
+    - ./gradlew --no-daemon check
+  cache:
+    key: "build"
+    untracked: true
+    paths:
+      - lib/prism
+      - $GRADLE

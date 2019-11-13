@@ -1,0 +1,133 @@
+// Base Plugins
+apply plugin: 'java'
+
+// Static Analysis
+apply plugin: 'pmd'
+apply plugin: 'checkstyle'
+
+// IDE Support
+apply plugin: 'idea'
+
+group 'de.tum.in'
+version '0.1.0'
+
+project.sourceCompatibility = JavaVersion.VERSION_11
+project.targetCompatibility = JavaVersion.VERSION_11
+
+def defaultEncoding = 'UTF-8'
+
+tasks.withType(JavaCompile) {
+    options.encoding = defaultEncoding
+}
+
+tasks.withType(Javadoc) { options.encoding = defaultEncoding }
+
+tasks.withType(JavaExec) {
+    environment "LD_LIBRARY_PATH", "$project.buildDir/lib"
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+// PMD
+// https://docs.gradle.org/current/dsl/org.gradle.api.plugins.quality.Pmd.html
+
+pmd {
+    toolVersion = "6.19.0" // https://pmd.github.io/
+    reportsDir = file("$project.buildDir/reports/pmd")
+    ruleSetFiles = files("$project.rootDir/config/pmd-rules.xml")
+    ruleSets = [] // We specify all rules in rules.xml
+    consoleOutput = false
+    ignoreFailures = false
+}
+tasks.withType(Pmd) {
+    reports {
+        xml.enabled = false
+        html.enabled = true
+    }
+}
+
+// Checkstyle
+// https://docs.gradle.org/current/dsl/org.gradle.api.plugins.quality.Checkstyle.html
+
+checkstyle {
+    toolVersion = "8.26" // http://checkstyle.sourceforge.net/releasenotes.html
+    configFile = file("$project.rootDir/config/checkstyle.xml")
+    ignoreFailures = false
+    maxWarnings = 0
+    showViolations = false // Don't litter console
+    checkstyleMain {
+        configProperties = ['suppression-file':
+                                    "$project.rootDir/config/checkstyle-main-suppression.xml"]
+    }
+    checkstyleTest {
+        configProperties = ['suppression-file':
+                                    "$project.rootDir/config/checkstyle-test-suppression.xml"]
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation files("$project.buildDir/lib/prism.jar")
+
+    // https://github.com/google/guava
+    implementation 'com.google.guava:guava:28.1-jre'
+    // https://github.com/incaseoftrouble/naturals-util
+    implementation 'de.tum.in:naturals-util:0.14.1'
+    implementation group: 'com.zaxxer', name: 'SparseBitSet', version: '1.2'
+
+    // https://github.com/vigna/fastutil
+    implementation 'it.unimi.dsi:fastutil:8.3.0'
+    // https://immutables.github.io/
+    implementation 'org.immutables:value:2.8.1:annotations'
+    implementation 'commons-cli:commons-cli:1.4'
+
+    // https://github.com/google/gson
+    testImplementation 'com.google.code.gson:gson:2.8.5'
+    // https://github.com/junit-team/junit5/
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.4.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.4.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.4.2")
+
+    annotationProcessor group: 'org.immutables', name: 'value', version: '2.8.1'
+}
+
+test {
+    environment "LD_LIBRARY_PATH", "lib/prism/prism/lib"
+    useJUnitPlatform()
+}
+
+//noinspection GroovyAssignabilityCheck
+task prismJar(type: Jar) {
+    archiveFileName = 'prism.jar'
+    destinationDirectory = file("$project.buildDir/lib")
+    from "$project.rootDir/lib/prism/prism/src"
+    from "$project.rootDir/lib/prism/prism/classes"
+    from {
+        file("$project.rootDir/lib/prism/prism/lib/")
+                .list { file, name -> name.endsWith(".jar") }
+                .collect { zipTree("$project.rootDir/lib/prism/prism/lib/" + it) }
+    }
+}
+
+task prismNatives(type: Copy) {
+    from "lib/prism/prism/lib"
+    include "*.so"
+    include "*.dll"
+    into "$project.buildDir/lib/"
+}
+
+task prism {
+    dependsOn prismJar, prismNatives
+}
+
+tasks.withType(JavaCompile) {
+    dependsOn prism
+}
