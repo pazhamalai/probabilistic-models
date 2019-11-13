@@ -23,7 +23,33 @@ Setup for other projects
 4. Add this project in your `settings.gradle` with `include '<path>'` (use `:` instead of `/`, for example `lib:models`)
 5. Add it as dependency in `build.gradle` with `implementation project('<path>')`
 6. Run `./gradlew compileJava` to check that everything is working.
-
+7. (if using the `application` gradle plugin) Add the following code to your `build.gradle` to include the PRISM native libraries in the generated application
+   ```groovy
+    task extractScriptTemplates {
+        doLast {
+            file("<path>/config/template-unix.default.txt").text =
+                    startScripts.unixStartScriptGenerator.template.asString()
+            file("<path>/config/template-windows.default.txt").text =
+                    startScripts.windowsStartScriptGenerator.template.asString()
+        }
+    }
+    
+    startScripts {
+        unixStartScriptGenerator.template = resources.text.fromFile('<path>/config/template-unix.txt')
+        windowsStartScriptGenerator.template = resources.text.fromFile('<path>/config/template-windows.txt')
+    }
+    
+    distributions {
+        main {
+            contents {
+                from("$project.buildDir/lib/") {
+                    include "*.so"
+                    into "lib"
+                }
+            }
+        }
+    }
+   ```
 Developer Instructions
 ======================
 
