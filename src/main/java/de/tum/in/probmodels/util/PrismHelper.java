@@ -11,8 +11,6 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.Option;
 import org.immutables.value.Value;
 import parser.PrismParser;
 import parser.ast.Expression;
@@ -27,20 +25,6 @@ public final class PrismHelper {
 
   private PrismHelper() {
     // Empty
-  }
-
-  public static PrismParseResult parse(CommandLine commandLine, Option modelOption,
-      @Nullable Option propertiesOption, Option constantsOption)
-      throws IOException, PrismException {
-    String modelPath = commandLine.getOptionValue(modelOption.getLongOpt());
-    @Nullable
-    String propertiesPath = propertiesOption == null
-        ? null : commandLine.getOptionValue(propertiesOption.getLongOpt());
-    @Nullable
-    String constantsString = commandLine.hasOption(constantsOption.getLongOpt())
-        ? commandLine.getOptionValue(constantsOption.getLongOpt())
-        : null;
-    return parse(modelPath, propertiesPath, constantsString);
   }
 
   public static PrismParseResult parse(String modelPath, @Nullable String propertiesPath,

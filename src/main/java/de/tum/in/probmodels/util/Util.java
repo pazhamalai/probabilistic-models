@@ -21,8 +21,7 @@ import java.util.function.IntPredicate;
 import javax.annotation.Nullable;
 
 public final class Util {
-  public static final double DEFAULT_PRECISION = 1e-6;
-  private static final double MACHINE_EPS = 1e-15;
+  private static final double MACHINE_EPS = 1.0e-15;
 
   private Util() {
     // Empty

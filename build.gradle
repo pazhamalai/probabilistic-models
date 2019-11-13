@@ -1,5 +1,5 @@
 // Base Plugins
-apply plugin: 'java'
+apply plugin: 'java-library'
 
 // Static Analysis
 apply plugin: 'pmd'
@@ -80,14 +80,13 @@ dependencies {
     // https://github.com/google/guava
     implementation 'com.google.guava:guava:28.1-jre'
     // https://github.com/incaseoftrouble/naturals-util
-    implementation 'de.tum.in:naturals-util:0.14.1'
+    api 'de.tum.in:naturals-util:0.14.1'
     implementation group: 'com.zaxxer', name: 'SparseBitSet', version: '1.2'
 
     // https://github.com/vigna/fastutil
-    implementation 'it.unimi.dsi:fastutil:8.3.0'
+    api 'it.unimi.dsi:fastutil:8.3.0'
     // https://immutables.github.io/
-    implementation 'org.immutables:value:2.8.1:annotations'
-    implementation 'commons-cli:commons-cli:1.4'
+    api 'org.immutables:value:2.8.1:annotations'
 
     // https://github.com/google/gson
     testImplementation 'com.google.code.gson:gson:2.8.5'
@@ -108,12 +107,12 @@ test {
 task prismJar(type: Jar) {
     archiveFileName = 'prism.jar'
     destinationDirectory = file("$project.buildDir/lib")
-    from "$project.rootDir/lib/prism/prism/src"
-    from "$project.rootDir/lib/prism/prism/classes"
+    from "$project.projectDir/lib/prism/prism/src"
+    from "$project.projectDir/lib/prism/prism/classes"
     from {
-        file("$project.rootDir/lib/prism/prism/lib/")
+        file("$project.projectDir/lib/prism/prism/lib/")
                 .list { file, name -> name.endsWith(".jar") }
-                .collect { zipTree("$project.rootDir/lib/prism/prism/lib/" + it) }
+                .collect { zipTree("$project.projectDir/lib/prism/prism/lib/" + it) }
     }
 }
 
