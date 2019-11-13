@@ -75,7 +75,7 @@ repositories {
 }
 
 dependencies {
-    implementation files("$project.buildDir/lib/prism.jar")
+    api files("$project.buildDir/lib/prism.jar")
 
     // https://github.com/google/guava
     implementation 'com.google.guava:guava:28.1-jre'

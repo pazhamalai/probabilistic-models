@@ -1,5 +1,6 @@
 package de.tum.in.probmodels.util;
 
+import de.tum.in.probmodels.model.Distribution;
 import de.tum.in.probmodels.util.annotation.Tuple;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -7,7 +8,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -82,6 +85,21 @@ public final class PrismHelper {
     constants.iterateProperty();
 
     return PrismParseResultTuple.create(modulesFile, propertiesFile, constants, expressionList);
+  }
+
+  public static explicit.Distribution scale(Distribution distribution) {
+    double total = distribution.sum();
+    if (Util.isEqual(total, 0.0d)) {
+      return null;
+    }
+    if (Util.isEqual(total, 1.0d)) {
+      return new explicit.Distribution(distribution.objectIterator());
+    }
+    Map<Integer, Double> map = new HashMap<>(distribution.size());
+    for (Map.Entry<Integer, Double> entry : distribution) {
+      map.put(entry.getKey(), entry.getValue() / total);
+    }
+    return new explicit.Distribution(map.entrySet().iterator());
   }
 
   @Value.Immutable

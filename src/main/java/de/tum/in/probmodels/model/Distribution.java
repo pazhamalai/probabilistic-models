@@ -7,7 +7,6 @@ import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -15,21 +14,6 @@ import java.util.function.IntToDoubleFunction;
 import java.util.function.IntUnaryOperator;
 
 public class Distribution implements Iterable<Int2DoubleMap.Entry> {
-  public static explicit.Distribution scale(Distribution distribution) {
-    double total = distribution.sum();
-    if (Util.isEqual(total, 0.0d)) {
-      return null;
-    }
-    if (Util.isEqual(total, 1.0d)) {
-      return new explicit.Distribution(distribution.objectIterator());
-    }
-    Map<Integer, Double> map = new HashMap<>(distribution.size());
-    for (Map.Entry<Integer, Double> entry : distribution) {
-      map.put(entry.getKey(), entry.getValue() / total);
-    }
-    return new explicit.Distribution(map.entrySet().iterator());
-  }
-
   private final Int2DoubleMap map;
   private final NatBitSet support = NatBitSets.set();
 
