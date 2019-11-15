@@ -40,11 +40,6 @@ public abstract class PrismGenerator implements Generator<State> {
     }
   }
 
-  @Override
-  public RewardGenerator<State> rewardGenerator(int rewardIndex) {
-    return new PrismRewardGenerator(rewardIndex, generator);
-  }
-
   protected abstract Collection<Choice<State>> getChoices(State state) throws PrismException;
 
   protected Collection<Object2DoubleMap.Entry<State>> transitions(int choiceIndex, int count) {

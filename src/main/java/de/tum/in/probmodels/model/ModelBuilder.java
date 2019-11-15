@@ -6,11 +6,11 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 import parser.State;
 
-public final class ConstructModel {
-  private ConstructModel() {
+public final class ModelBuilder {
+  private ModelBuilder() {
   }
 
-  public static StateToIndex<State> fill(Model model, Generator<State> gen) {
+  public static StateToIndex<State> build(Model model, Generator<State> gen) {
     Queue<State> queue = new ArrayDeque<>(gen.initialStates());
     StateToIndex<State> stateIndices = new StateToIndex<>();
 
