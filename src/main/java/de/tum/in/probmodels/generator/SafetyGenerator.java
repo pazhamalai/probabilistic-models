@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.function.Predicate;
-import prism.PrismException;
 
 public class SafetyGenerator<S> implements Generator<ProductState<S, Boolean>> {
   private static final ProductState<?, Boolean> ERROR = ProductState.of(null, false);
@@ -20,7 +19,7 @@ public class SafetyGenerator<S> implements Generator<ProductState<S, Boolean>> {
   }
 
   @Override
-  public Collection<ProductState<S, Boolean>> initialStates() throws PrismException {
+  public Collection<ProductState<S, Boolean>> initialStates() {
     Collection<S> systemInitialStates = system.initialStates();
     Collection<ProductState<S, Boolean>> productInitialStates =
         new ArrayList<>(systemInitialStates.size());
@@ -40,8 +39,7 @@ public class SafetyGenerator<S> implements Generator<ProductState<S, Boolean>> {
   }
 
   @Override
-  public Collection<Choice<ProductState<S, Boolean>>> choices(ProductState<S, Boolean> state)
-      throws PrismException {
+  public Collection<Choice<ProductState<S, Boolean>>> choices(ProductState<S, Boolean> state) {
     if (state.equals(ERROR)) {
       return Collections.emptyList();
     }

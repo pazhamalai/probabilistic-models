@@ -19,7 +19,7 @@ public class CtmcUniformizingGenerator extends PrismGenerator {
   }
 
   @Override
-  public Collection<Choice<State>> choices(State state) throws PrismException {
+  public Collection<Choice<State>> getChoices(State state) throws PrismException {
     ModelGenerator generator = generator();
     generator.exploreState(state);
 

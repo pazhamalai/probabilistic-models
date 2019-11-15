@@ -23,10 +23,29 @@ public abstract class PrismGenerator implements Generator<State> {
   }
 
   @Override
-  public Collection<State> initialStates() throws PrismException {
-    return generator.getInitialStates();
+  public Collection<State> initialStates() {
+    try {
+      return generator.getInitialStates();
+    } catch (PrismException e) {
+      throw new PrismWrappedException(e);
+    }
   }
 
+  @Override
+  public final Collection<Choice<State>> choices(State state) {
+    try {
+      return getChoices(state);
+    } catch (PrismException e) {
+      throw new PrismWrappedException(e);
+    }
+  }
+
+  @Override
+  public RewardGenerator<State> rewardGenerator(int rewardIndex) {
+    return new PrismRewardGenerator(rewardIndex, generator);
+  }
+
+  protected abstract Collection<Choice<State>> getChoices(State state) throws PrismException;
 
   protected Collection<Object2DoubleMap.Entry<State>> transitions(int choiceIndex, int count) {
     return new TransitionLazyCollection(generator, count, choiceIndex);
@@ -95,4 +114,5 @@ public abstract class PrismGenerator implements Generator<State> {
       return entry;
     }
   }
+
 }
