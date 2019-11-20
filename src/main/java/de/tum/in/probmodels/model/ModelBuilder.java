@@ -108,12 +108,17 @@ public final class ModelBuilder {
         quotientModel.addInitialState(stateToQuotientArray[initialState]));
 
     NatBitSet[] quotientToClassArray = new NatBitSet[quotientModel.getNumStates()];
-    for (int i = 0; i < numStates; i++) { // NOPMD
-      int quotientState = stateToQuotientArray[i];
+    for (int state = 0; state < numStates; state++) { // NOPMD
+      int quotientState = stateToQuotientArray[state];
       assert quotientToClassArray[quotientState] == null
-          || quotientToClassArray[quotientState] == stateClass[i];
-      quotientToClassArray[quotientState] = stateClass[i];
-      assert quotientToClassArray[quotientState].contains(i);
+          || quotientToClassArray[quotientState] == stateClass[state];
+      NatBitSet clazz = stateClass[state];
+      if (clazz == null) {
+        quotientToClassArray[quotientState] = NatBitSets.singleton(state);
+      } else {
+        quotientToClassArray[quotientState] = clazz;
+      }
+      assert quotientToClassArray[quotientState].contains(state);
     }
 
     IntFunction<NatBitSet> quotientToClass = i -> quotientToClassArray[i];
