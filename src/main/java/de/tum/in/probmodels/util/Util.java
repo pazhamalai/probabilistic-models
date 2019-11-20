@@ -21,7 +21,7 @@ import java.util.function.IntPredicate;
 import javax.annotation.Nullable;
 
 public final class Util {
-  private static final double MACHINE_EPS = 1.0e-15;
+  public static final double MACHINE_EPS = 1.0e-15;
 
   private Util() {
     // Empty
@@ -131,6 +131,10 @@ public final class Util {
   }
 
   public static boolean lessOrEqual(double d1, double d2) {
-    return d1 <= d2 || isEqual(d1, d2);
+    return d1 - d2 < MACHINE_EPS;
+  }
+
+  public static boolean strictlyLess(double d1, double d2) {
+    return d1 - d2 < -MACHINE_EPS;
   }
 }
