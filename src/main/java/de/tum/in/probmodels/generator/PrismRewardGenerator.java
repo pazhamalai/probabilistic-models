@@ -10,7 +10,7 @@ public class PrismRewardGenerator implements RewardGenerator<State> {
   private final int rewardIndex;
   private final ModelGenerator generator;
 
-  PrismRewardGenerator(int rewardIndex, ModelGenerator generator) {
+  public PrismRewardGenerator(int rewardIndex, ModelGenerator generator) {
     this.rewardIndex = rewardIndex;
     this.generator = generator;
   }
@@ -18,7 +18,11 @@ public class PrismRewardGenerator implements RewardGenerator<State> {
   @Override
   public double stateReward(State state) {
     try {
-      return generator.getStateReward(rewardIndex, state);
+      double reward = generator.getStateReward(rewardIndex, state);
+      if (Double.isNaN(reward)) {
+        throw new IllegalStateException("NaN reward on state " + state);
+      }
+      return reward;
     } catch (PrismException e) {
       throw new PrismWrappedException(e);
     }
@@ -28,7 +32,12 @@ public class PrismRewardGenerator implements RewardGenerator<State> {
   public double transitionReward(State state, @Nullable Object label) {
     try {
       // Note: getStateActionReward expects to receive null as label in some cases
-      return generator.getStateActionReward(rewardIndex, state, label);
+      double reward = generator.getStateActionReward(rewardIndex, state, label);
+      if (Double.isNaN(reward)) {
+        String message = String.format("NaN reward on state %s / transition %s", state, label);
+        throw new IllegalStateException(message);
+      }
+      return reward;
     } catch (PrismException e) {
       throw new PrismWrappedException(e);
     }
