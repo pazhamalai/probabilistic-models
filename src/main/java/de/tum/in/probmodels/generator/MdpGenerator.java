@@ -28,10 +28,8 @@ public class MdpGenerator extends PrismGenerator {
 
       Object2DoubleMap<State> map = new Object2DoubleOpenHashMap<>(transitionCount);
       map.defaultReturnValue(Double.NaN);
-      transitions(choiceIndex, transitionCount).forEach(entry -> {
-        double oldValue = map.put(entry.getKey(), entry.getDoubleValue());
-        assert Double.isNaN(oldValue);
-      });
+      transitions(choiceIndex, transitionCount)
+          .forEach(entry -> map.mergeDouble(entry.getKey(), entry.getDoubleValue(), Double::sum));
       choices.add(Choice.of(actionLabel, map));
     }
 
