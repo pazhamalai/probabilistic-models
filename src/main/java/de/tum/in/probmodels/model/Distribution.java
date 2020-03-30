@@ -118,7 +118,7 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     return d;
   }
 
-  public double sumWeightedExcept(IntToDoubleFunction f, int state) {
+  public double sumWeightedExceptJacobi(IntToDoubleFunction f, int state) {
     // TODO Awkward name: This is not only sum but also rescale
     double sum = 0.0d;
     double weight = 0.0d;
