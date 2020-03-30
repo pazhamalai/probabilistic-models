@@ -35,20 +35,22 @@ Setup for other projects
     }
     
     startScripts {
-        unixStartScriptGenerator.template = resources.text.fromFile('<path>/config/template-unix.txt')
-        windowsStartScriptGenerator.template = resources.text.fromFile('<path>/config/template-windows.txt')
+        unixStartScriptGenerator.template = resources.text.fromFile("<path>/config/template-unix.txt")
+        windowsStartScriptGenerator.template = resources.text.fromFile("<path>/config/template-windows.txt")
     }
     
     distributions {
         main {
             contents {
-                from("$project.buildDir/lib/") {
+                from("$rootProject.buildDir/lib/") {
+                    include "*.dll"
                     include "*.so"
                     into "lib"
                 }
             }
         }
     }
+
    ```
 Developer Instructions
 ======================
