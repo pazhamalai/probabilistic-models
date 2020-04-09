@@ -81,10 +81,11 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       distributions = new ArrayList<>(model.getChoices(state));
     }
 
+    int stateRepresentative = representative(state);
     boolean anyDifferent = false;
     IntUnaryOperator map = successor -> {
       int representative = this.representative(successor);
-      return representative == state ? -1 : representative;
+      return representative == stateRepresentative ? -1 : representative;
     };
 
     ListIterator<Distribution> iterator = distributions.listIterator();
@@ -185,7 +186,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     // Collapse the states
     IntList representatives = new IntArrayList(stateList.size());
     for (IntSet states : stateList) {
-      // collapse() also updates collapsedStates
+      // collapse() also updates removedStates
       representatives.add(collapse(states));
     }
     logger.log(Level.FINER, "Representatives: {0}", representatives);
@@ -215,6 +216,8 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
             distributions = model.getChoices(state);
           }
         }
+        assert distributions.stream().map(Distribution::support)
+            .noneMatch(support -> support.intersects(states));
         collapsedDistributions.addAll(distributions);
         overwrite.remove(state);
       });
@@ -230,12 +233,11 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       representatives.add(representative);
     }
 
-    // Collapsed states are empty
-    assert overwrite.keySet().stream().noneMatch(this::isRemoved);
-
     // Remap all transitions. Other states might be pointing to some now merged state - we have
     // to update them too.
     overwriteCacheValid.retainAll(representatives);
+    removedStates.andNot(representativeStates);
+    assert overwrite.keySet().stream().noneMatch(this::isRemoved);
 
     if (logger.isLoggable(Level.INFO)) {
       int transitionCount = 0;
@@ -280,7 +282,6 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     int representativeState = representative(anyState);
 
     removedStates.or(states);
-    removedStates.clear(representativeState);
     representativeStates.set(representativeState);
 
     return representativeState;
