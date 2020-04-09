@@ -41,8 +41,6 @@ public final class Mec {
           continue;
         }
 
-        assert choiceCount == model.getChoices(state).size();
-
         IntFunction<IntSet> constructor = k -> NatBitSets.boundedFilledSet(choiceCount);
         IntSet stateActions = actions.computeIfAbsent(state, constructor);
         NatBitSet removeActions = NatBitSets.boundedSet(choiceCount);
