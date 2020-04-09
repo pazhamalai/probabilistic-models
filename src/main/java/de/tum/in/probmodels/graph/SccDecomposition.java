@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.PrimitiveIterator;
+import java.util.function.IntPredicate;
 
 /**
  * Finds the SCCs of a given graph / transition system using Tarjan's algorithm. Taken from owl.
@@ -31,6 +32,7 @@ public final class SccDecomposition {
   static final int NO_LINK = Integer.MAX_VALUE;
 
   private final IntStack explorationStack = new IntArrayList();
+  private final IntPredicate restriction;
   private final boolean includeTransient;
   private final Deque<TarjanState> path = new ArrayDeque<>();
   private final IntSet processedNodes = new IntOpenHashSet();
@@ -40,18 +42,20 @@ public final class SccDecomposition {
   private int index = 0;
 
   private SccDecomposition(Int2ObjectFunction<? extends PrimitiveIterator.OfInt> successorFunction,
-      boolean includeTransient) {
+      IntPredicate restriction, boolean includeTransient) {
     this.successorFunction = successorFunction;
+    this.restriction = restriction;
     this.includeTransient = includeTransient;
   }
 
   public static List<NatBitSet> computeSccs(
       Int2ObjectFunction<? extends PrimitiveIterator.OfInt> function,
-      IntCollection initialStates, boolean includeTransient) {
-    SccDecomposition decomposition = new SccDecomposition(function, includeTransient);
+      IntCollection initialStates, IntPredicate restriction, boolean includeTransient) {
+    SccDecomposition decomposition = new SccDecomposition(function, restriction, includeTransient);
 
     initialStates.forEach((int initialState) -> {
-      if (!decomposition.stateMap.containsKey(initialState)
+      if (restriction.test(initialState)
+          && !decomposition.stateMap.containsKey(initialState)
           && !decomposition.processedNodes.contains(initialState)) {
         decomposition.run(initialState);
       }
@@ -59,6 +63,7 @@ public final class SccDecomposition {
 
     assert includeTransient
         || decomposition.sccs.stream().noneMatch(scc -> isTransient(function, scc));
+    assert decomposition.sccs.stream().allMatch(scc -> scc.intStream().allMatch(restriction));
 
     return Collections.unmodifiableList(decomposition.sccs);
   }
@@ -90,6 +95,7 @@ public final class SccDecomposition {
   private TarjanState create(int node) {
     assert !stateMap.containsKey(node) && !processedNodes.contains(node)
         : String.format("Node %s already processed", node);
+    assert restriction.test(node);
 
     int nodeIndex = index;
     index += 1;
@@ -125,7 +131,7 @@ public final class SccDecomposition {
           continue;
         }
 
-        if (processedNodes.contains(successor)) {
+        if (processedNodes.contains(successor) || !restriction.test(successor)) {
           continue;
         }
 

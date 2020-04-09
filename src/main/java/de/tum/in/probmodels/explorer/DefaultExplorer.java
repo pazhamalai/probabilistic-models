@@ -5,10 +5,10 @@ import de.tum.in.naturals.set.NatBitSets;
 import de.tum.in.probmodels.generator.Choice;
 import de.tum.in.probmodels.generator.Generator;
 import de.tum.in.probmodels.model.Action;
+import de.tum.in.probmodels.model.Distribution;
+import de.tum.in.probmodels.model.Distributions;
 import de.tum.in.probmodels.model.Model;
 import de.tum.in.probmodels.model.StateToIndex;
-import de.tum.in.probmodels.model.distribution.Distribution;
-import de.tum.in.probmodels.model.distribution.Distributions;
 import de.tum.in.probmodels.util.Util;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntCollection;
@@ -76,7 +76,6 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
       }
       Distribution distribution = skippedAny ? builder.scaled() : builder.build();
       assert distribution.isEmpty() || Util.isOne(distribution.sum()) : distribution;
-
       model.addChoice(stateId, Action.of(distribution, choice.label()));
     }
     return state;

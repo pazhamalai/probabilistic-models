@@ -1,4 +1,4 @@
-package de.tum.in.probmodels.model.distribution;
+package de.tum.in.probmodels.model;
 
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
@@ -127,7 +127,6 @@ public class ArrayDistribution implements Distribution {
     return builder;
   }
 
-  @SuppressWarnings("NonFinalFieldReferenceInEquals")
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -138,14 +137,12 @@ public class ArrayDistribution implements Distribution {
     }
     Distribution other = (Distribution) o;
 
+    if (!support.equals(other.support())) {
+      return false;
+    }
+
     if (other instanceof ArrayDistribution) {
       ArrayDistribution array = (ArrayDistribution) other;
-      if (lazyHash != 0 && array.lazyHash != 0 && lazyHash != array.lazyHash) {
-        return false;
-      }
-      if (!support.equals(other.support())) {
-        return false;
-      }
       assert Arrays.equals(successors, array.successors);
       for (int i = 0; i < successors.length; i++) {
         if (!Util.isEqual(probabilities[i], array.probabilities[i])) {
@@ -155,9 +152,6 @@ public class ArrayDistribution implements Distribution {
       return true;
     }
 
-    if (!support.equals(other.support())) {
-      return false;
-    }
     for (int i = 0; i < successors.length; i++) {
       if (!Util.isEqual(probabilities[i], other.get(successors[i]))) {
         return false;

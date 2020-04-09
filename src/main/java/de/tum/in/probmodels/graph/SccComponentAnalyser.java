@@ -14,8 +14,9 @@ public class SccComponentAnalyser implements ComponentAnalyser {
   public List<NatBitSet> findComponents(Model model, NatBitSet states) {
     logger.log(Level.FINE, "\nStarting BSCC search");
 
-    List<NatBitSet> bsccs = new ArrayList<>(SccDecomposition.computeSccs(model::getSuccessors,
-        model.getInitialStates(), false));
+    List<NatBitSet> sccs = SccDecomposition.computeSccs(model::getSuccessors,
+        model.getInitialStates(), states::contains, false);
+    List<NatBitSet> bsccs = new ArrayList<>(sccs);
     bsccs.removeIf(scc -> scc.intStream().anyMatch(state ->
         model.someSuccessorsMatch(state, successor -> !scc.contains(successor))));
 

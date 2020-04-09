@@ -5,8 +5,6 @@ import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
 import de.tum.in.naturals.unionfind.IntArrayUnionFind;
 import de.tum.in.naturals.unionfind.IntUnionFind;
-import de.tum.in.probmodels.model.distribution.Distribution;
-import de.tum.in.probmodels.model.distribution.DistributionBuilder;
 import explicit.SuccessorsIterator;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -76,19 +74,21 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
 
   private List<Distribution> computeSuccessors(int state, IntUnaryOperator map,
-      Predicate<Distribution> unchangedDistribution) {
+      Predicate<Distribution> unchanged) {
     List<Distribution> distributions = overwrite.get(state);
     if (distributions == null) {
       distributions = new ArrayList<>(model.getChoices(state));
     }
 
     boolean anyDifferent = false;
-
     ListIterator<Distribution> iterator = distributions.listIterator();
     while (iterator.hasNext()) {
       Distribution distribution = iterator.next();
 
-      if (unchangedDistribution.test(distribution)) {
+      if (distribution.isEmpty()) {
+        anyDifferent = true;
+        iterator.remove();
+      } else if (unchanged.test(distribution)) {
         assert Objects.equals(distribution, distribution.map(map).scaled());
       } else {
         DistributionBuilder builder = distribution.map(map);
@@ -103,7 +103,10 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       }
     }
 
+    assert distributions.stream().allMatch(unchanged);
     assert distributions.stream().allMatch(d -> d.equals(d.map(map).build()));
+    assert distributions.stream().noneMatch(Distribution::isEmpty);
+    assert distributions.stream().noneMatch(d -> d.contains(state));
     return anyDifferent ? distributions : null;
   }
 
@@ -111,6 +114,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   public List<Distribution> getChoices(int state) {
     assert !isRemoved(state);
 
+    List<Distribution> distributions = null;
     if (overwriteCacheValid.add(state)) {
       IntUnaryOperator map = successor -> {
         int representative = representative(successor);
@@ -120,9 +124,8 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
       Predicate<Distribution> unchanged = d ->
           !d.containsOneOf(removedStates) && !d.contains(state);
-      var distributions = computeSuccessors(state, map, unchanged);
+      distributions = computeSuccessors(state, map, unchanged);
       if (distributions != null) {
-        assert distributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
         Set<Distribution> uniqueDistributions = new HashSet<>(distributions.size());
         Predicate<Distribution> filter = uniqueDistributions::add;
         distributions.removeIf(filter.negate());
@@ -130,16 +133,18 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       }
     }
 
-    assert overwriteCacheValid.contains(state);
-    List<Distribution> distributions = overwrite.get(state);
     if (distributions == null) {
-      // State retains its original transitions
-      distributions = model.getChoices(state);
+      distributions = overwrite.get(state);
+      if (distributions == null) {
+        distributions = model.getChoices(state);
+      }
     }
 
+    assert distributions != null;
+    assert distributions.stream().noneMatch(Distribution::isEmpty);
+    assert distributions.stream().noneMatch(d -> d.contains(state)) : state + " " + distributions;
     assert distributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
-    assert distributions.stream()
-        .map(Distribution::support).flatMap(Collection::stream).distinct()
+    assert distributions.stream().map(Distribution::support).flatMap(Collection::stream)
         .allMatch(s -> s == representative(s));
 
     return Collections.unmodifiableList(distributions);
@@ -182,8 +187,6 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
         stateList.stream().noneMatch(others -> !others.equals(states)
             && !Sets.intersection(states, others).isEmpty()));
 
-    logger.log(Level.FINER, "Collapsing state sets {0}", stateList);
-
     NatBitSet newCollapsed = NatBitSets.set();
     stateList.forEach(newCollapsed::or);
 
@@ -219,9 +222,10 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
         return successorRepresentative == representative ? -1 : successorRepresentative;
       };
 
-      // Delete transitions of all states in the MEC, only keep outgoing ones
       states.forEach((int state) -> {
-        var distributions = computeSuccessors(state, map, d -> !d.containsOneOf(newCollapsed));
+        Predicate<Distribution> unchanged = d ->
+            !d.containsOneOf(removedStates) && !d.contains(representative);
+        var distributions = computeSuccessors(state, map, unchanged);
         if (distributions == null) {
           distributions = overwrite.get(state);
           if (distributions == null) {
@@ -234,6 +238,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
       // No internal transitions
       assert collapsedDistributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
+      assert collapsedDistributions.stream().noneMatch(d -> d.contains(representative));
       // All states are cleared
       assert states.stream().mapToInt(Integer::intValue)
           .mapToObj(overwrite::get).allMatch(Objects::isNull);

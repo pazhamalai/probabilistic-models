@@ -2,8 +2,8 @@ package de.tum.in.probmodels.graph;
 
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
+import de.tum.in.probmodels.model.Distribution;
 import de.tum.in.probmodels.model.Model;
-import de.tum.in.probmodels.model.distribution.Distribution;
 import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntIterators;
@@ -48,11 +48,12 @@ public final class EndComponentDecomposition {
         return union.iterator();
       };
 
-      List<Mec> preMecs = SccDecomposition.computeSccs(successorFunction, mec.states, true)
-          .stream()
-          .map(scc -> Mec.create(model, scc))
-          .filter(m -> !m.states.isEmpty())
-          .collect(Collectors.toList());
+      List<Mec> preMecs =
+          SccDecomposition.computeSccs(successorFunction, mec.states, s -> true, true)
+              .stream()
+              .map(scc -> Mec.create(model, scc))
+              .filter(m -> !m.states.isEmpty())
+              .collect(Collectors.toList());
 
       if (preMecs.size() == 1) {
         Mec refinedMec = preMecs.get(0);

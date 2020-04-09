@@ -2,7 +2,7 @@ package de.tum.in.probmodels.explorer;
 
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.probmodels.model.Action;
-import de.tum.in.probmodels.model.distribution.Distribution;
+import de.tum.in.probmodels.model.Distribution;
 import explicit.Model;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import java.util.List;

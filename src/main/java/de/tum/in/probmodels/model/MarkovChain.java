@@ -3,7 +3,6 @@ package de.tum.in.probmodels.model;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import de.tum.in.probmodels.model.distribution.Distribution;
 import explicit.DTMC;
 import explicit.SuccessorsIterator;
 import it.unimi.dsi.fastutil.ints.IntIterator;

@@ -2,8 +2,8 @@ package de.tum.in.probmodels.graph;
 
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
+import de.tum.in.probmodels.model.Distribution;
 import de.tum.in.probmodels.model.Model;
-import de.tum.in.probmodels.model.distribution.Distribution;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntIterator;
