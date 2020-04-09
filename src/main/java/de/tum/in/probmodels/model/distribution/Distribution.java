@@ -3,6 +3,7 @@ package de.tum.in.probmodels.model.distribution;
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.BitSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -66,14 +67,14 @@ public interface Distribution extends Iterable<Int2DoubleMap.Entry> {
 
   default boolean containsOneOf(BitSet set) {
     if (set.isEmpty()) {
-      return true;
+      return false;
     }
     return support().intersects(NatBitSets.asSet(set));
   }
 
-  default boolean containsOneOf(NatBitSet set) {
+  default boolean containsOneOf(IntSet set) {
     if (set.isEmpty()) {
-      return true;
+      return false;
     }
     return support().intersects(set);
   }
