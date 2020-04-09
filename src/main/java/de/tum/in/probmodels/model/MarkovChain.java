@@ -1,7 +1,9 @@
 package de.tum.in.probmodels.model;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
+import de.tum.in.probmodels.model.distribution.Distribution;
 import explicit.DTMC;
 import explicit.SuccessorsIterator;
 import it.unimi.dsi.fastutil.ints.IntIterator;
@@ -22,18 +24,10 @@ public class MarkovChain extends DefaultModel implements DTMC {
 
   @Override
   public void clearState(int i) {
-    transitions.remove(i);
-  }
-
-  public void setProbability(int i, int j, double prob) {
-    Distribution distribution = transitions.get(i);
-    if (distribution.get(j) != 0.0) {
-      numTransitions--;
+    Distribution distribution = transitions.remove(i);
+    if (distribution != null) {
+      numTransitions -= distribution.size();
     }
-    if (prob != 0.0) {
-      numTransitions++;
-    }
-    distribution.set(j, prob);
   }
 
   @Override
@@ -90,20 +84,14 @@ public class MarkovChain extends DefaultModel implements DTMC {
   @Override
   public int getNumTransitions(int s) {
     Distribution distribution = transitions.get(s);
-    if (distribution == null) {
-      return 0;
-    }
-    return distribution.size();
+    return distribution == null ? 0 : distribution.size();
   }
 
   @Override
   @Deprecated
   public Iterator<Map.Entry<Integer, Double>> getTransitionsIterator(int s) {
     Distribution distribution = transitions.get(s);
-    if (distribution == null) {
-      return Collections.<Integer, Double>emptyMap().entrySet().iterator();
-    }
-    return distribution.objectIterator();
+    return distribution == null ? Collections.emptyIterator() : distribution.objectIterator();
   }
 
   @Override
@@ -117,10 +105,6 @@ public class MarkovChain extends DefaultModel implements DTMC {
    */
   public Distribution getTransitions(int s) {
     return transitions.get(s);
-  }
-
-  public void setTransition(int state, Distribution distribution) {
-    transitions.put(state, distribution);
   }
 
   @Override
@@ -139,8 +123,9 @@ public class MarkovChain extends DefaultModel implements DTMC {
 
   @Override
   public void addChoice(int state, Distribution distribution) {
-    Distribution oldValue = transitions.put(state, distribution);
+    Distribution oldValue = transitions.put(state, checkNotNull(distribution));
     checkArgument(oldValue == null, "MarkovChain can only have one distribution");
+    numTransitions += distribution.size();
   }
 
   @Override
@@ -152,7 +137,11 @@ public class MarkovChain extends DefaultModel implements DTMC {
   @Override
   public void setChoice(int state, int action, Distribution distribution) {
     checkArgument(action == 0);
-    transitions.put(state, distribution);
+    Distribution oldValue = transitions.put(state, checkNotNull(distribution));
+    if (oldValue != null) {
+      numTransitions -= oldValue.size();
+    }
+    numTransitions += distribution.size();
   }
 
   @Override
@@ -165,11 +154,11 @@ public class MarkovChain extends DefaultModel implements DTMC {
   public void setActions(int state, List<Action> actions) {
     checkArgument(actions.size() <= 1);
     if (actions.isEmpty()) {
-      transitions.remove(state);
+      clearState(state);
     } else {
       Action action = actions.get(0);
       checkArgument(action.label() == null);
-      transitions.put(state, action.distribution());
+      setChoice(state, 0, action.distribution());
     }
   }
 

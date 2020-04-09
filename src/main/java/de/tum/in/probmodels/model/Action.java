@@ -1,5 +1,6 @@
 package de.tum.in.probmodels.model;
 
+import de.tum.in.probmodels.model.distribution.Distribution;
 import de.tum.in.probmodels.util.annotation.HashedTuple;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;

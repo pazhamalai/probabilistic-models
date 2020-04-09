@@ -1,5 +1,5 @@
-Usage in other projects - compiling PRISM
-=========================================
+Usage in other projects
+=======================
 
 When using this project in another project perform the following steps.
 (If not already happened) Init the PRISM repo `git submodule update --init --recursive`.
@@ -8,12 +8,13 @@ For windows users:
   1. Install cygwin
   2. Run `cygwin.bat` in the install dir to start cygwin bash
   3. `cd /cygdrive/path/to/lib/prism/prism`
-  4. `dos2unix * ../cudd/*` (to fix incorrect line endings if checked out via windows git and not cygwin git) 
-  5. `make JAVA_DIR=/cygdrive/path/to/jdk JAVAC=/cygdrive/path/to/jdk/bin/javac`
+  4. `dos2unix * ../cudd/*` (to potentially fix incorrect line endings)
+  5. `make`. If that doesn't work: `make JAVA_DIR=/cygdrive/path/to/jdk JAVAC=/cygdrive/path/to/jdk/bin/javac`
     - Make sure that this JDK is <= the version you are using to develop.
     - Put the paths in quotes.
     - If there are spaces in the JAVAC path, escape them with `\` (on top of quotes!)
-
+  6. If you experience problems with PRISM not finding its dlls, copy them into the CWD of the command.
+ 
 Setup for other projects
 =======================
 

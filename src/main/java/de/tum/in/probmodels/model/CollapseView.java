@@ -5,6 +5,8 @@ import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
 import de.tum.in.naturals.unionfind.IntArrayUnionFind;
 import de.tum.in.naturals.unionfind.IntUnionFind;
+import de.tum.in.probmodels.model.distribution.Distribution;
+import de.tum.in.probmodels.model.distribution.DistributionBuilder;
 import explicit.SuccessorsIterator;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -13,6 +15,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSortedSet;
 import java.util.ArrayList;
@@ -23,6 +26,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.IntUnaryOperator;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -35,7 +40,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   private final NatBitSet representativeStates = NatBitSets.set();
   private final M model;
   private final Int2ObjectMap<List<Distribution>> overwrite = new Int2ObjectOpenHashMap<>();
-  private final NatBitSet overwriteCacheValid = NatBitSets.set();
+  private final IntSet overwriteCacheValid = new IntOpenHashSet();
 
   public CollapseView(M model) {
     this.model = model;
@@ -69,51 +74,60 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     return model.isInitialState(representative(state));
   }
 
+
+  private List<Distribution> computeSuccessors(int state) {
+    List<Distribution> distributions = overwrite.get(state);
+    if (distributions == null) {
+      distributions = new ArrayList<>(model.getChoices(state));
+    }
+
+    boolean anyDifferent = false;
+    IntUnaryOperator map = successor -> {
+      int representative = this.representative(successor);
+      return representative == state ? -1 : representative;
+    };
+
+    ListIterator<Distribution> iterator = distributions.listIterator();
+    while (iterator.hasNext()) {
+      Distribution distribution = iterator.next();
+
+      if (distribution.containsOneOf(removedStates)) {
+        DistributionBuilder builder = distribution.map(map);
+        if (builder.isEmpty()) {
+          anyDifferent = true;
+          iterator.remove();
+        } else {
+          Distribution scaled = builder.scaled();
+          anyDifferent = anyDifferent || !scaled.equals(distribution);
+          iterator.set(scaled);
+        }
+      } else {
+        assert Objects.equals(distribution, distribution.map(map).scaled());
+      }
+    }
+
+    return anyDifferent ? distributions : null;
+  }
+
   @Override
   public List<Distribution> getChoices(int state) {
     assert !isRemoved(state);
 
-    List<Distribution> distributions;
-    if (overwriteCacheValid.contains(state)) {
-      // This state has already been updated
-      distributions = overwrite.get(state);
-      if (distributions == null) {
-        // State retains its original transitions
-        distributions = model.getChoices(state);
+    if (overwriteCacheValid.add(state)) {
+      List<Distribution> distributions = computeSuccessors(state);
+      if (distributions != null) {
+        Set<Distribution> uniqueDistributions = new HashSet<>(distributions.size());
+        Predicate<Distribution> filter = uniqueDistributions::add;
+        distributions.removeIf(filter.negate());
+        overwrite.put(state, distributions);
       }
-    } else {
-      distributions = overwrite.get(state);
-      if (distributions == null) {
-        // Make the list modifiable
-        distributions = new ArrayList<>(model.getChoices(state));
-      }
+    }
 
-      // Update the cache
-      boolean anyDifferent = false;
-
-      ListIterator<Distribution> iterator = distributions.listIterator();
-      while (iterator.hasNext()) {
-        Distribution distribution = iterator.next();
-        if (distribution.containsOneOf(removedStates)) {
-          anyDifferent = true;
-          iterator.set(distribution.map(this::representative));
-        } else {
-          assert Objects.equals(distribution, distribution.map(this::representative));
-        }
-      }
-      if (anyDifferent) {
-        Set<Distribution> uniqueDistributions = new HashSet<>(distributions);
-        if (representativeStates.contains(state)) {
-          // Remove self-loops
-          uniqueDistributions.remove(new Distribution(state, 1.0d));
-        }
-
-        List<Distribution> newDistributions = new ArrayList<>(uniqueDistributions);
-        overwrite.put(state, newDistributions);
-        distributions = newDistributions;
-      }
-
-      overwriteCacheValid.set(state);
+    // This state has already been updated
+    List<Distribution> distributions = overwrite.get(state);
+    if (distributions == null) {
+      // State retains its original transitions
+      distributions = model.getChoices(state);
     }
 
     assert distributions.stream()
@@ -186,41 +200,34 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
     for (int i = 0; i < stateList.size(); i++) {
       IntSet states = stateList.get(i);
-      int representativeState = representatives.getInt(i);
-      assert states.contains(representativeState)
-          && representativeState == representative(representativeState);
+      int representative = representatives.getInt(i);
+      assert states.contains(representative)
+          && representative == representative(representative);
 
       Collection<Distribution> collapsedDistributions = new HashSet<>();
 
       // Delete transitions of all states in the MEC, only keep outgoing ones
       states.forEach((int state) -> {
-        List<Distribution> distributions = overwrite.get(state);
+        List<Distribution> distributions = computeSuccessors(state);
         if (distributions == null) {
-          distributions = model.getChoices(state);
-        }
-
-        distributions.forEach(distribution -> {
-          // Build filtered distribution (only outgoing transitions)
-          Distribution newDistribution = distribution.map(successor -> {
-            int successorRepresentative = representative(successor);
-            return successorRepresentative == representativeState ? -1 : successorRepresentative;
-          });
-
-          if (!newDistribution.isEmpty()) {
-            newDistribution.scale();
-            // No internal transitions will be added (important for correctness)
-            assert newDistribution.support().intStream().noneMatch(states::contains);
-            collapsedDistributions.add(newDistribution);
+          distributions = overwrite.get(state);
+          if (distributions == null) {
+            distributions = model.getChoices(state);
           }
-        });
+        }
+        collapsedDistributions.addAll(distributions);
         overwrite.remove(state);
       });
 
+      // No internal transitions
+      assert collapsedDistributions.stream().map(Distribution::support)
+          .noneMatch(support -> support.intersects(states));
       // All states are cleared
       assert states.stream().mapToInt(Integer::intValue)
           .mapToObj(overwrite::get).allMatch(Objects::isNull);
-      overwrite.put(representativeState, new ArrayList<>(collapsedDistributions));
-      representatives.add(representativeState);
+
+      overwrite.put(representative, new ArrayList<>(collapsedDistributions));
+      representatives.add(representative);
     }
 
     // Collapsed states are empty
@@ -228,8 +235,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
     // Remap all transitions. Other states might be pointing to some now merged state - we have
     // to update them too.
-    overwriteCacheValid.and(representatives);
-    overwrite.keySet().retainAll(representatives);
+    overwriteCacheValid.retainAll(representatives);
 
     if (logger.isLoggable(Level.INFO)) {
       int transitionCount = 0;

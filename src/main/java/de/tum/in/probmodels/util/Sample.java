@@ -2,7 +2,7 @@ package de.tum.in.probmodels.util;
 
 import static de.tum.in.probmodels.util.Util.isZero;
 
-import de.tum.in.probmodels.model.Distribution;
+import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.List;
@@ -15,32 +15,17 @@ public final class Sample {
     // Empty
   }
 
-  public static int sample(Distribution distribution) {
-    if (distribution.isEmpty()) {
+  public static int sample(double[] values) {
+    if (values.length == 0) {
       return -1;
     }
-    if (distribution.size() == 1) {
-      return distribution.support().firstInt();
+    if (values.length == 1) {
+      return values[0] == 0.0d ? -1 : 0;
     }
 
-    int[] keys = new int[distribution.size()];
-    double[] values = new double[distribution.size()];
-
-    int index = 0;
-    for (Int2DoubleMap.Entry entry : distribution) {
-      keys[index] = entry.getIntKey();
-      values[index] = entry.getDoubleValue();
-      index += 1;
-    }
-
-    int sample = sample(values, values.length);
-    return sample == -1 ? -1 : keys[sample];
-  }
-
-  public static int sample(double[] values, int bound) {
     double sum = 0.0d;
-    for (int i = 0; i < bound; i++) {
-      sum += values[i];
+    for (double value : values) {
+      sum += value;
     }
 
     if (isZero(sum)) {
@@ -51,7 +36,7 @@ public final class Sample {
     double sampledValue = random.nextDouble() * sum;
     // Search the successor corresponding to this value
     double partialSum = 0.0d;
-    for (int i = 0; i < bound; i++) {
+    for (int i = 0; i < values.length; i++) {
       partialSum += values[i];
       if (partialSum >= sampledValue) {
         return i;
@@ -69,17 +54,24 @@ public final class Sample {
       return distribution.keySet().iterator().nextInt();
     }
 
-    int[] keys = new int[distribution.size()];
-    double[] values = new double[distribution.size()];
-
-    int index = 0;
-    for (Int2DoubleMap.Entry entry : distribution.int2DoubleEntrySet()) {
-      keys[index] = entry.getIntKey();
-      values[index] = entry.getDoubleValue();
-      index += 1;
+    double sum = 0.0d;
+    DoubleIterator iterator = distribution.values().iterator();
+    while (iterator.hasNext()) {
+      sum += iterator.nextDouble();
     }
-    int sample = sample(values, values.length);
-    return sample == -1 ? -1 : keys[sample];
+
+    // Sample a random value in [0, sum)
+    double sampledValue = random.nextDouble() * sum;
+    // Search the successor corresponding to this value
+    double partialSum = 0.0d;
+    for (Int2DoubleMap.Entry entry : distribution.int2DoubleEntrySet()) {
+      partialSum += entry.getDoubleValue();
+      if (partialSum >= sampledValue) {
+        return entry.getIntKey();
+      }
+    }
+
+    throw new AssertionError("Not sampling any value");
   }
 
   public static int sampleUniform(IntList values) {

@@ -11,6 +11,9 @@ import de.tum.in.naturals.unionfind.IntArrayUnionFind;
 import de.tum.in.naturals.unionfind.IntUnionFind;
 import de.tum.in.probmodels.generator.Choice;
 import de.tum.in.probmodels.generator.Generator;
+import de.tum.in.probmodels.model.distribution.Distribution;
+import de.tum.in.probmodels.model.distribution.DistributionBuilder;
+import de.tum.in.probmodels.model.distribution.Distributions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -42,7 +45,7 @@ public final class ModelBuilder {
       int stateId = stateIndices.getStateId(state);
 
       for (Choice<State> choice : gen.choices(state)) {
-        Distribution distribution = new Distribution();
+        DistributionBuilder builder = Distributions.defaultBuilder();
         for (var entry : choice.transitions().object2DoubleEntrySet()) {
           State successor = entry.getKey();
           if (!stateIndices.contains(successor)) {
@@ -50,9 +53,9 @@ public final class ModelBuilder {
             stateIndices.addState(successor, model.addState());
           }
           int successorId = stateIndices.getStateId(successor);
-          distribution.add(successorId, entry.getDoubleValue());
+          builder.add(successorId, entry.getDoubleValue());
         }
-        model.addChoice(stateId, distribution);
+        model.addChoice(stateId, builder.build());
       }
     }
     return stateIndices;
@@ -94,7 +97,7 @@ public final class ModelBuilder {
     for (int state = 0; state < numStates; state++) {
       int quotientState = stateToQuotientArray[state];
       for (Action action : model.getActions(state)) {
-        Distribution quotientDistribution = action.distribution().map(stateToQuotientState);
+        Distribution quotientDistribution = action.distribution().map(stateToQuotientState).build();
         if (quotientDistribution.size() == 1 && quotientDistribution.contains(quotientState)) {
           if (selfLoops.put(quotientState, action.label())) {
             quotientModel.addChoice(quotientState, Action.of(quotientDistribution, action.label()));
@@ -153,17 +156,17 @@ public final class ModelBuilder {
         int index = iterator.nextIndex();
         Action action = iterator.next();
 
-        Distribution distribution = new Distribution();
+        DistributionBuilder builder = Distributions.defaultBuilder();
         action.distribution().forEach((target, probability) -> {
           int restrictedDestination = originalToRestrictedStates[target];
           if (restrictedDestination >= 0) {
-            distribution.add(restrictedDestination, probability);
+            builder.add(restrictedDestination, probability);
           }
         });
-        if (distribution.isEmpty()) {
+        if (builder.isEmpty()) {
           removedActions.set(index);
         } else {
-          model.addChoice(restrictedState, Action.of(distribution.scale(), action.label()));
+          model.addChoice(restrictedState, Action.of(builder.scaled(), action.label()));
         }
       }
       restrictedActions[restrictedState] = NatBitSets.compact(removedActions.complement());

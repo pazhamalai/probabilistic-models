@@ -1,5 +1,6 @@
 package de.tum.in.probmodels.model;
 
+import de.tum.in.probmodels.model.distribution.Distribution;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import java.util.Collection;
 import java.util.List;
@@ -21,7 +22,7 @@ public interface Model extends explicit.ModelSimple {
   }
 
   default void forEachTransition(int state, int action, TransitionConsumer consumer) {
-    getChoice(state, action).forEach(consumer);
+    getChoice(state, action).forEach(consumer::accept);
   }
 
   void addChoice(int state, Distribution distribution);
