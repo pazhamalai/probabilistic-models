@@ -1,7 +1,5 @@
 package de.tum.in.probmodels.explorer;
 
-import de.tum.in.naturals.set.NatBitSet;
-import de.tum.in.naturals.set.NatBitSets;
 import de.tum.in.probmodels.generator.Choice;
 import de.tum.in.probmodels.generator.Generator;
 import de.tum.in.probmodels.model.Action;
@@ -13,13 +11,16 @@ import de.tum.in.probmodels.util.Util;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import java.util.List;
 
 public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
   private final StateToIndex<S> stateMap = new StateToIndex<>();
   // All states which are in the partial model and explored
-  private final NatBitSet exploredStates = NatBitSets.set();
+  private final IntSet exploredStates = new IntOpenHashSet();
   private final M model;
   private final Generator<S> generator;
   private final boolean removeSelfLoops;
@@ -44,8 +45,8 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
   }
 
   @Override
-  public NatBitSet exploredStates() {
-    return exploredStates;
+  public IntSet exploredStates() {
+    return IntSets.unmodifiable(exploredStates);
   }
 
   @Override
@@ -56,7 +57,7 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
   @Override
   public S exploreState(int stateId) {
     assert stateMap.check(stateId) && !isExploredState(stateId);
-    exploredStates.set(stateId);
+    exploredStates.add(stateId);
 
     S state = stateMap.getState(stateId);
     assert state != null;
