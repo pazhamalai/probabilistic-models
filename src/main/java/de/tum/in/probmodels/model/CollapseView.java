@@ -118,7 +118,9 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
         return representative == state ? -1 : representative;
       };
 
-      var distributions = computeSuccessors(state, map, d -> !d.containsOneOf(removedStates));
+      Predicate<Distribution> unchanged = d ->
+          !d.containsOneOf(removedStates) && !d.contains(state);
+      var distributions = computeSuccessors(state, map, unchanged);
       if (distributions != null) {
         assert distributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
         Set<Distribution> uniqueDistributions = new HashSet<>(distributions.size());
