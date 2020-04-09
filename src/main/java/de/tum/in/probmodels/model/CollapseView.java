@@ -75,24 +75,22 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   }
 
 
-  private List<Distribution> computeSuccessors(int state) {
+  private List<Distribution> computeSuccessors(int state, IntUnaryOperator map,
+      Predicate<Distribution> unchangedDistribution) {
     List<Distribution> distributions = overwrite.get(state);
     if (distributions == null) {
       distributions = new ArrayList<>(model.getChoices(state));
     }
 
-    int stateRepresentative = representative(state);
     boolean anyDifferent = false;
-    IntUnaryOperator map = successor -> {
-      int representative = this.representative(successor);
-      return representative == stateRepresentative ? -1 : representative;
-    };
 
     ListIterator<Distribution> iterator = distributions.listIterator();
     while (iterator.hasNext()) {
       Distribution distribution = iterator.next();
 
-      if (distribution.containsOneOf(removedStates)) {
+      if (unchangedDistribution.test(distribution)) {
+        assert Objects.equals(distribution, distribution.map(map).scaled());
+      } else {
         DistributionBuilder builder = distribution.map(map);
         if (builder.isEmpty()) {
           anyDifferent = true;
@@ -102,11 +100,10 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
           anyDifferent = anyDifferent || !scaled.equals(distribution);
           iterator.set(scaled);
         }
-      } else {
-        assert Objects.equals(distribution, distribution.map(map).scaled());
       }
     }
 
+    assert distributions.stream().allMatch(d -> d.equals(d.map(map).build()));
     return anyDifferent ? distributions : null;
   }
 
@@ -115,8 +112,15 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     assert !isRemoved(state);
 
     if (overwriteCacheValid.add(state)) {
-      List<Distribution> distributions = computeSuccessors(state);
+      IntUnaryOperator map = successor -> {
+        int representative = representative(successor);
+        assert !isRemoved(representative);
+        return representative == state ? -1 : representative;
+      };
+
+      var distributions = computeSuccessors(state, map, d -> !d.containsOneOf(removedStates));
       if (distributions != null) {
+        assert distributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
         Set<Distribution> uniqueDistributions = new HashSet<>(distributions.size());
         Predicate<Distribution> filter = uniqueDistributions::add;
         distributions.removeIf(filter.negate());
@@ -124,13 +128,14 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       }
     }
 
-    // This state has already been updated
+    assert overwriteCacheValid.contains(state);
     List<Distribution> distributions = overwrite.get(state);
     if (distributions == null) {
       // State retains its original transitions
       distributions = model.getChoices(state);
     }
 
+    assert distributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
     assert distributions.stream()
         .map(Distribution::support).flatMap(Collection::stream).distinct()
         .allMatch(s -> s == representative(s));
@@ -177,19 +182,18 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
     logger.log(Level.FINER, "Collapsing state sets {0}", stateList);
 
-    NatBitSet newCollapsedStates = NatBitSets.set();
-    stateList.forEach(newCollapsedStates::or);
+    NatBitSet newCollapsed = NatBitSets.set();
+    stateList.forEach(newCollapsed::or);
 
     // Only collapse states of the collapsed model
-    assert !newCollapsedStates.intersects(removedStates);
+    assert !newCollapsed.intersects(removedStates);
 
     // Collapse the states
     IntList representatives = new IntArrayList(stateList.size());
     for (IntSet states : stateList) {
-      // collapse() also updates removedStates
       representatives.add(collapse(states));
     }
-    logger.log(Level.FINER, "Representatives: {0}", representatives);
+    assert representativeStates.containsAll(representatives);
 
     // Representatives are consistent
     assert stateList.stream().allMatch(states ->
@@ -207,37 +211,41 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
       Collection<Distribution> collapsedDistributions = new HashSet<>();
 
+      IntUnaryOperator map = successor -> {
+        int successorRepresentative = this.representative(successor);
+        assert !removedStates.contains(successorRepresentative);
+        return successorRepresentative == representative ? -1 : successorRepresentative;
+      };
+
       // Delete transitions of all states in the MEC, only keep outgoing ones
       states.forEach((int state) -> {
-        List<Distribution> distributions = computeSuccessors(state);
+        var distributions = computeSuccessors(state, map, d -> !d.containsOneOf(newCollapsed));
         if (distributions == null) {
           distributions = overwrite.get(state);
           if (distributions == null) {
             distributions = model.getChoices(state);
           }
         }
-        assert distributions.stream().map(Distribution::support)
-            .noneMatch(support -> support.intersects(states));
         collapsedDistributions.addAll(distributions);
         overwrite.remove(state);
       });
 
       // No internal transitions
-      assert collapsedDistributions.stream().map(Distribution::support)
-          .noneMatch(support -> support.intersects(states));
+      assert collapsedDistributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
       // All states are cleared
       assert states.stream().mapToInt(Integer::intValue)
           .mapToObj(overwrite::get).allMatch(Objects::isNull);
 
       overwrite.put(representative, new ArrayList<>(collapsedDistributions));
-      representatives.add(representative);
     }
+
+    // Collapsed states are empty
+    assert overwrite.keySet().stream().noneMatch(this::isRemoved);
 
     // Remap all transitions. Other states might be pointing to some now merged state - we have
     // to update them too.
-    overwriteCacheValid.retainAll(representatives);
-    removedStates.andNot(representativeStates);
-    assert overwrite.keySet().stream().noneMatch(this::isRemoved);
+    overwriteCacheValid.clear();
+    overwriteCacheValid.addAll(representatives);
 
     if (logger.isLoggable(Level.INFO)) {
       int transitionCount = 0;
@@ -279,12 +287,13 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
     int anyState = representative(states.iterator().nextInt());
     states.forEach((int state) -> collapseUF.union(anyState, state));
-    int representativeState = representative(anyState);
+    int representative = representative(anyState);
 
     removedStates.or(states);
-    representativeStates.set(representativeState);
+    removedStates.clear(representative);
+    representativeStates.set(representative);
 
-    return representativeState;
+    return representative;
   }
 
   @Override
