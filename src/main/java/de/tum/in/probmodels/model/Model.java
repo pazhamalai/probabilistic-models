@@ -1,6 +1,5 @@
 package de.tum.in.probmodels.model;
 
-import de.tum.in.probmodels.model.distribution.Distribution;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import java.util.Collection;
 import java.util.List;

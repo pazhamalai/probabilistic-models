@@ -1,4 +1,4 @@
-package de.tum.in.probmodels.model.distribution;
+package de.tum.in.probmodels.model;
 
 public final class Distributions {
   private Distributions() {

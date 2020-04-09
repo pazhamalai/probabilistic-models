@@ -1,4 +1,4 @@
-package de.tum.in.probmodels.model.distribution;
+package de.tum.in.probmodels.model;
 
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
@@ -81,5 +81,10 @@ public final class EmptyDistribution implements Distribution {
   @Override
   public int hashCode() {
     return getClass().hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return "{}";
   }
 }

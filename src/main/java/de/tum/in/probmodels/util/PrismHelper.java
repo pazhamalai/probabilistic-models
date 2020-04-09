@@ -1,6 +1,6 @@
 package de.tum.in.probmodels.util;
 
-import de.tum.in.probmodels.model.distribution.MapDistribution;
+import de.tum.in.probmodels.model.MapDistribution;
 import de.tum.in.probmodels.util.annotation.Tuple;
 import java.io.BufferedInputStream;
 import java.io.IOException;
