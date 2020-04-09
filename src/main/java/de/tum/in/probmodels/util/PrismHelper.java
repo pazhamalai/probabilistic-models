@@ -1,6 +1,6 @@
 package de.tum.in.probmodels.util;
 
-import de.tum.in.probmodels.model.Distribution;
+import de.tum.in.probmodels.model.distribution.MapDistribution;
 import de.tum.in.probmodels.util.annotation.Tuple;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -87,7 +87,7 @@ public final class PrismHelper {
     return PrismParseResultTuple.create(modulesFile, propertiesFile, constants, expressionList);
   }
 
-  public static explicit.Distribution scale(Distribution distribution) {
+  public static explicit.Distribution scale(MapDistribution distribution) {
     double total = distribution.sum();
     if (Util.isEqual(total, 0.0d)) {
       return null;

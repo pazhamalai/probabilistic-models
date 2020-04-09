@@ -1,6 +1,7 @@
 package de.tum.in.probmodels.model;
 
 import com.google.common.collect.Lists;
+import de.tum.in.probmodels.model.distribution.Distribution;
 import explicit.NondetModelSimple;
 import explicit.SuccessorsIterator;
 import java.util.ArrayList;

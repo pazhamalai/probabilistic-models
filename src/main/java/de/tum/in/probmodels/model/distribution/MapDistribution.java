@@ -1,72 +1,48 @@
-package de.tum.in.probmodels.model;
+package de.tum.in.probmodels.model.distribution;
 
 import de.tum.in.naturals.set.NatBitSet;
 import de.tum.in.naturals.set.NatBitSets;
+import de.tum.in.probmodels.util.Sample;
 import de.tum.in.probmodels.util.Util;
 import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
-import java.util.BitSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.IntToDoubleFunction;
 import java.util.function.IntUnaryOperator;
 
-public class Distribution implements Iterable<Int2DoubleMap.Entry> {
+public class MapDistribution implements Distribution {
   private final Int2DoubleMap map;
-  private final NatBitSet support = NatBitSets.set();
+  private final NatBitSet support;
+  private int lazyHash = 0;
 
-  public Distribution() {
-    map = new Int2DoubleOpenHashMap();
-    map.defaultReturnValue(0.0);
+  @SuppressWarnings("AssignmentOrReturnOfFieldWithMutableType")
+  MapDistribution(Int2DoubleMap map, NatBitSet support) {
+    this.map = map;
+    this.support = support;
+    this.map.defaultReturnValue(0.0);
   }
 
-  public Distribution(int key, double value) {
+  MapDistribution(int key, double value) {
     map = new Int2DoubleOpenHashMap(1);
     map.defaultReturnValue(0.0);
     map.put(key, value);
-    support.set(key);
+    support = NatBitSets.singleton(key);
   }
 
-  public void add(int j, double prob) {
-    double old = map.getOrDefault(j, -1.0d);
-    //noinspection FloatingPointEquality
-    if (old == -1.0d) {
-      map.put(j, prob);
-      support.set(j);
-    } else {
-      double newValue = prob + old;
-      if (newValue <= 0) {
-        support.clear(j);
-        map.remove(j);
-      } else {
-        map.put(j, newValue);
-      }
-    }
-  }
-
-  public void set(int j, double prob) {
-    // Intentionally do a precise comparison since even the smallest probability changes the
-    // underlying graph
-    // -> Important for component (SCC/EC) analysis
-    if (prob == 0.0d) {
-      map.remove(j);
-      support.clear(j);
-    } else {
-      map.put(j, prob);
-      support.set(j);
-    }
-  }
-
+  @Override
   public double get(int j) {
     return map.get(j);
   }
 
+  @Override
   public boolean contains(int j) {
     return support.contains(j);
   }
 
+  @SuppressWarnings("AssignmentOrReturnOfFieldWithMutableType")
+  @Override
   public NatBitSet support() {
     assert support.equals(map.keySet());
     return support;
@@ -82,16 +58,19 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     return map.entrySet().iterator();
   }
 
+  @Override
   public boolean isEmpty() {
     assert support.isEmpty() == map.isEmpty() : support + " " + map;
     return map.isEmpty();
   }
 
+  @Override
   public int size() {
     assert support.size() == map.size() : support + " " + map;
     return map.size();
   }
 
+  @Override
   public double sum() {
     double d = 0.0;
     DoubleIterator iterator = map.values().iterator();
@@ -101,15 +80,7 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     return d;
   }
 
-  public Distribution scale() {
-    double total = sum();
-    assert total > 0.0d;
-    for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
-      entry.setValue(entry.getDoubleValue() / total);
-    }
-    return this;
-  }
-
+  @Override
   public double sumWeighted(IntToDoubleFunction f) {
     double d = 0.0;
     for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
@@ -118,8 +89,8 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     return d;
   }
 
+  @Override
   public double sumWeightedExceptJacobi(IntToDoubleFunction f, int state) {
-    // TODO Awkward name: This is not only sum but also rescale
     double sum = 0.0d;
     double weight = 0.0d;
     for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
@@ -133,15 +104,30 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     return weight == 0.0d ? 0.0d : sum / weight;
   }
 
-  public Distribution map(IntUnaryOperator map) {
-    Distribution distribution = new Distribution();
+  @Override
+  public int sample() {
+    return Sample.sample(map);
+  }
+
+  @Override
+  public int sampleWeighted(WeightFunction weights) {
+    Int2DoubleMap weighted = new Int2DoubleOpenHashMap(map);
+    for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
+      entry.setValue(weights.accept(entry.getIntKey(), entry.getDoubleValue()));
+    }
+    return Sample.sample(weighted);
+  }
+
+  @Override
+  public DistributionBuilder map(IntUnaryOperator map) {
+    Builder builder = new Builder();
     for (Int2DoubleMap.Entry entry : this.map.int2DoubleEntrySet()) {
       int key = map.applyAsInt(entry.getIntKey());
       if (key >= 0) {
-        distribution.add(key, entry.getDoubleValue());
+        builder.add(key, entry.getDoubleValue());
       }
     }
-    return distribution;
+    return builder;
   }
 
   @Override
@@ -154,12 +140,11 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     }
     Distribution other = (Distribution) o;
 
-    if (!support.equals(other.support)) {
+    if (!support.equals(other.support())) {
       return false;
     }
     for (Int2DoubleMap.Entry entry : this.map.int2DoubleEntrySet()) {
-      if (!Util.isEqual(entry.getDoubleValue(),
-          other.map.getOrDefault(entry.getIntKey(), -1))) {
+      if (!Util.isEqual(entry.getDoubleValue(), other.get(entry.getIntKey()))) {
         return false;
       }
     }
@@ -168,7 +153,10 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
 
   @Override
   public int hashCode() {
-    return map.keySet().hashCode();
+    if (lazyHash == 0) {
+      lazyHash = support.hashCode();
+    }
+    return lazyHash;
   }
 
   @Override
@@ -176,28 +164,52 @@ public class Distribution implements Iterable<Int2DoubleMap.Entry> {
     return map.toString();
   }
 
-  public boolean isSubsetOf(BitSet set) {
-    if (size() > set.size()) {
-      return false;
+  @Override
+  public void forEach(DistributionConsumer action) {
+    for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
+      action.accept(entry.getIntKey(), entry.getDoubleValue());
     }
-    return NatBitSets.asSet(set).containsAll(support);
   }
 
-  public boolean containsOneOf(BitSet set) {
-    if (set.isEmpty()) {
-      return true;
-    }
-    return support.intersects(NatBitSets.asSet(set));
-  }
+  public static class Builder extends AbstractBuilder {
+    @Override
+    public Distribution scaled() {
+      NatBitSet support = support();
+      if (support.isEmpty()) {
+        return EmptyDistribution.INSTANCE;
+      }
+      int size = support.size();
+      if (size == 1) {
+        int key = support.firstInt();
+        return new MapDistribution(key, 1.0d);
+      }
 
-  public boolean containsOneOf(NatBitSet set) {
-    if (set.isEmpty()) {
-      return true;
+      double sum = 0.0d;
+      Int2DoubleMap map = map();
+      DoubleIterator iterator = map.values().iterator();
+      while (iterator.hasNext()) {
+        sum += iterator.nextDouble();
+      }
+      for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
+        entry.setValue(entry.getDoubleValue() / sum);
+      }
+      return new MapDistribution(map, support);
     }
-    return support.intersects(set);
-  }
 
-  public void forEach(BiConsumer<Integer, Double> action) {
-    map.forEach(action);
+    @Override
+    public Distribution build() {
+      NatBitSet support = support();
+      if (support.isEmpty()) {
+        return EmptyDistribution.INSTANCE;
+      }
+      int size = support.size();
+      if (size == 1) {
+        int key = support.firstInt();
+        return new MapDistribution(key, 1.0d);
+      }
+
+      Int2DoubleMap map = map();
+      return new MapDistribution(map, support);
+    }
   }
 }
