@@ -35,4 +35,9 @@ public class MdpGenerator extends PrismGenerator {
 
     return choices;
   }
+
+  @Override
+  public String toString() {
+    return "MDPgen";
+  }
 }

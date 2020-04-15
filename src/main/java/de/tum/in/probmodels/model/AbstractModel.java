@@ -181,4 +181,9 @@ public abstract class AbstractModel implements Model {
   public void clearPredecessorRelation() {
     // Intentionally empty
   }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName();
+  }
 }

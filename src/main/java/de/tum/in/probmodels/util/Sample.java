@@ -15,6 +15,10 @@ public final class Sample {
     // Empty
   }
 
+  public static int sample(int max) {
+    return random.nextInt(max);
+  }
+
   public static int sample(double[] values) {
     if (values.length == 0) {
       return -1;

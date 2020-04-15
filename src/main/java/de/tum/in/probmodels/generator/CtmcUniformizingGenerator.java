@@ -52,4 +52,9 @@ public class CtmcUniformizingGenerator extends PrismGenerator {
     }
     return Collections.singleton(Choice.of(map));
   }
+
+  @Override
+  public String toString() {
+    return String.format("CTMCUniformizingGen(%.2f)", rate);
+  }
 }

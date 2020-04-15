@@ -66,4 +66,9 @@ public class SafetyGenerator<S> implements Generator<ProductState<S, Boolean>> {
 
     return productChoices;
   }
+
+  @Override
+  public String toString() {
+    return String.format("SafetyGen(%s, %s)", system, safety);
+  }
 }
