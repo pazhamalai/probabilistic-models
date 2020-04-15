@@ -128,4 +128,10 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
   public S getState(int stateId) {
     return stateMap.getState(stateId);
   }
+
+  @Override
+  public String toString() {
+    return String.format("DefaultExplorer(%s, %s, %s)", model.getClass(), generator,
+        removeSelfLoops ? "inline" : "normal");
+  }
 }

@@ -46,4 +46,9 @@ public class CtmcEmbeddingGenerator extends PrismGenerator {
     }
     return Collections.singleton(Choice.of(map));
   }
+
+  @Override
+  public String toString() {
+    return "CTMCEmbeddingGen";
+  }
 }
