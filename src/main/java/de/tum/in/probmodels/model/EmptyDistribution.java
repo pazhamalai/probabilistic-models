@@ -33,6 +33,11 @@ public final class EmptyDistribution implements Distribution {
   }
 
   @Override
+  public double sumWeighted(double[] array) {
+    return 0.0d;
+  }
+
+  @Override
   public double sumWeighted(IntToDoubleFunction f) {
     return 0.0d;
   }

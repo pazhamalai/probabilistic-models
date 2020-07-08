@@ -41,6 +41,8 @@ public interface Distribution extends Iterable<Int2DoubleMap.Entry> {
 
   double sum();
 
+  double sumWeighted(double[] array);
+
   double sumWeighted(IntToDoubleFunction f);
 
   double sumWeightedExceptJacobi(IntToDoubleFunction f, int state);

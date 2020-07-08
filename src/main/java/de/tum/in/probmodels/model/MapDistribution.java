@@ -81,6 +81,15 @@ public class MapDistribution implements Distribution {
   }
 
   @Override
+  public double sumWeighted(double[] array) {
+    double d = 0.0;
+    for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
+      d += array[entry.getIntKey()] * entry.getDoubleValue();
+    }
+    return d;
+  }
+
+  @Override
   public double sumWeighted(IntToDoubleFunction f) {
     double d = 0.0;
     for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {

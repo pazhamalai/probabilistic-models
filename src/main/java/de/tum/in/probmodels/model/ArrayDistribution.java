@@ -75,6 +75,15 @@ public class ArrayDistribution implements Distribution {
   }
 
   @Override
+  public double sumWeighted(double[] array) {
+    double d = 0.0;
+    for (int i = 0; i < successors.length; i++) {
+      d += array[successors[i]] * probabilities[i];
+    }
+    return d;
+  }
+
+  @Override
   public double sumWeighted(IntToDoubleFunction f) {
     double d = 0.0;
     for (int i = 0; i < successors.length; i++) {

@@ -1,3 +1,5 @@
+src/*/generated
+
 # ==== Gradle files ====
 # Source: https://github.com/github/gitignore/blob/master/Gradle.gitignore
 
