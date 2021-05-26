@@ -11,12 +11,14 @@ import de.tum.in.naturals.unionfind.IntArrayUnionFind;
 import de.tum.in.naturals.unionfind.IntUnionFind;
 import de.tum.in.probmodels.generator.Choice;
 import de.tum.in.probmodels.generator.Generator;
+import de.tum.in.probmodels.graph.Mec;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Queue;
+import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
@@ -167,6 +169,47 @@ public final class ModelBuilder {
         }
       }
       restrictedActions[restrictedState] = NatBitSets.compact(removedActions.complement());
+      /* if (addedActions == 0) {
+        newModel.addDeadlockState(restrictedState);
+      } */
+    }
+    model.getInitialStates().forEach((int initialState) -> {
+      int restrictedInitialState = originalToRestrictedStates[initialState];
+      if (restrictedInitialState != -1) {
+        newModel.addInitialState(restrictedInitialState);
+      }
+    });
+
+    IntUnaryOperator stateMapping = i -> restrictedToOriginalStates[i];
+    IntFunction<NatBitSet> stateActions = i -> restrictedActions[i];
+    return RestrictedModelTuple.create(newModel, stateMapping, stateActions);
+  }
+
+  public static <T extends Model> RestrictedModel<T> buildMecRestrictedModel(T model,
+      Supplier<T> restrictedModelConstructor, Mec mec) {
+    T newModel = restrictedModelConstructor.get();
+    checkArgument(newModel.getNumStates() == 0);
+    int[] originalToRestrictedStates = new int[model.getNumStates()];
+    Arrays.fill(originalToRestrictedStates, -1);
+    mec.states.forEach((int allowedState) ->
+            originalToRestrictedStates[allowedState] = newModel.addState());
+
+    int restrictedStates = newModel.getNumStates();
+    assert restrictedStates == mec.states.size();
+    int[] restrictedToOriginalStates = new int[restrictedStates];
+    NatBitSet[] restrictedActions = new NatBitSet[restrictedStates];
+
+    for (int originalState = 0; originalState < model.getNumStates(); originalState++) {
+      if (originalToRestrictedStates[originalState] == -1) {
+        continue;
+      }
+      int restrictedState = originalToRestrictedStates[originalState];
+      restrictedToOriginalStates[restrictedState] = originalState;
+
+      IntSet mecActions = mec.actions.get(originalState);
+      NatBitSet actions = NatBitSets.setWithExpectedLength(mecActions.size());
+      mecActions.forEach((IntConsumer) actions::set);
+      restrictedActions[restrictedState] = NatBitSets.compact(actions);
       /* if (addedActions == 0) {
         newModel.addDeadlockState(restrictedState);
       } */
