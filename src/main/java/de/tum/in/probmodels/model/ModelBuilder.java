@@ -214,12 +214,7 @@ public final class ModelBuilder {
         newModel.addDeadlockState(restrictedState);
       } */
     }
-    model.getInitialStates().forEach((int initialState) -> {
-      int restrictedInitialState = originalToRestrictedStates[initialState];
-      if (restrictedInitialState != -1) {
-        newModel.addInitialState(restrictedInitialState);
-      }
-    });
+    newModel.addInitialState(mec.states.firstInt());
 
     IntUnaryOperator stateMapping = i -> restrictedToOriginalStates[i];
     IntFunction<NatBitSet> stateActions = i -> restrictedActions[i];
