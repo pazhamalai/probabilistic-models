@@ -207,8 +207,7 @@ public final class ModelBuilder {
       restrictedToOriginalStates[restrictedState] = originalState;
 
       IntSet mecActions = mec.actions.get(originalState);
-      NatBitSet actions = NatBitSets.setWithExpectedLength(mecActions.size());
-      mecActions.forEach((IntConsumer) actions::set);
+      NatBitSet actions = NatBitSets.copyOf(mecActions);
       restrictedActions[restrictedState] = NatBitSets.compact(actions);
       /* if (addedActions == 0) {
         newModel.addDeadlockState(restrictedState);
