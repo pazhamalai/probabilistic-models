@@ -218,6 +218,5 @@ public final class ModelBuilder {
     IntUnaryOperator stateMapping = i -> restrictedToOriginalStates[i];
     IntFunction<NatBitSet> stateActions = i -> restrictedActions[i];
     return RestrictedModelTuple.create(newModel, stateMapping, stateActions);
-    // a
   }
 }
