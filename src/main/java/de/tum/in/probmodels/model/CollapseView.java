@@ -304,8 +304,9 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   }
 
   @Override
+  // If the state represents an MEC, then return the MEC number to which it belongs, otherwise, the state is its own representative
   public int representative(int state) {
-    if (state >= collapseUF.size()) {
+    if (state >= collapseUF.size()) {  // the state is its own representative
       return state;
     }
     return collapseUF.find(state);
