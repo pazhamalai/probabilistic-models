@@ -33,13 +33,14 @@ import prism.ModelType;
 
 public class CollapseView<M extends Model> extends AbstractModel implements CollapseModel<M> {
   private static final Logger logger = Logger.getLogger(CollapseView.class.getName());
-  private final IntUnionFind collapseUF = new IntArrayUnionFind(0);
+  private final IntUnionFind collapseUF = new IntArrayUnionFind(0); // Maintains a union-find structure to store representatives of collapsed states.
   private final NatBitSet removedStates = NatBitSets.set();
   private final NatBitSet representativeStates = NatBitSets.set();
   private final M model;
-  private final Int2ObjectMap<List<Distribution>> overwrite = new Int2ObjectOpenHashMap<>();
-  private final IntSet overwriteCacheValid = new IntOpenHashSet();
+  private final Int2ObjectMap<List<Distribution>> overwrite = new Int2ObjectOpenHashMap<>(); // Implements a cache to avoid repeated computation of successors
+  private final IntSet overwriteCacheValid = new IntOpenHashSet(); // Membership in this indicates if the overwrite cache holds a valid distribution value (It could have been changed recently)
 
+  // Returns underlying model
   public CollapseView(M model) {
     this.model = model;
   }
@@ -50,6 +51,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   }
 
   @Override
+  // Returns number of states in current view of the model, excludes removed states
   public int getNumStates() {
     return model.getNumStates() - removedStates.size();
   }
@@ -72,7 +74,9 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     return model.isInitialState(representative(state));
   }
 
-
+  // Computed a new distribution for the given state. The map function helps in mapping the distribution for removed states to representative states
+  // the unchanged predicate returns false for a distribution if it might have an undesired state. If this is true, distribution is not recomputed
+  // Eg. If a distribution for a state might have a removed state, the distribution needs to computed.
   private List<Distribution> computeSuccessors(int state, IntUnaryOperator map,
       Predicate<Distribution> unchanged) {
     List<Distribution> distributions = overwrite.get(state);
@@ -80,6 +84,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       distributions = new ArrayList<>(model.getChoices(state));
     }
 
+    // the list of distributions is returned only if there are any changes. anyDifferent keeps track of this.
     boolean anyDifferent = false;
     ListIterator<Distribution> iterator = distributions.listIterator();
     while (iterator.hasNext()) {
@@ -88,24 +93,35 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       if (distribution.isEmpty()) {
         anyDifferent = true;
         iterator.remove();
-      } else if (unchanged.test(distribution)) {
+      }
+      // Don't do anything if distribution is unchanged.
+      else if (unchanged.test(distribution)) {
         assert Objects.equals(distribution, distribution.map(map).scaled());
-      } else {
+      }
+      // The support of the distribution must have changed, and it must be rebuilt
+      else {
+        // Returns a new distribution builder object according to the given map and the distribution
         DistributionBuilder builder = distribution.map(map);
         if (builder.isEmpty()) {
           anyDifferent = true;
           iterator.remove();
         } else {
+          // A scaled distribution is built, i.e., if the sum of the probabilities is less than 1, the distribution is scaled
           Distribution scaled = builder.scaled();
           anyDifferent = anyDifferent || !scaled.equals(distribution);
+          // Replaces "distribution" with "scaled"
           iterator.set(scaled);
         }
       }
     }
 
+    // Ensures that all distributions obey the unchanged criteria
     assert distributions.stream().allMatch(unchanged);
+    // Ensures that all distributions obey the mapping function
     assert distributions.stream().allMatch(d -> d.equals(d.map(map).build()));
+    // Ensures that no distribution is empty
     assert distributions.stream().noneMatch(Distribution::isEmpty);
+    // Ensures that no distribution's support consists of the state itself.
     assert distributions.stream().noneMatch(d -> d.contains(state));
     return anyDifferent ? distributions : null;
   }
@@ -115,24 +131,33 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     assert !isRemoved(state);
 
     List<Distribution> distributions = null;
+    // This is true only when state is not already in overwriteCacheValid. It means that the overwrite map contains the latest distributions and recomputation is not required.
+    // Further, it now marks that the state's entry in overwrite is now valid. (overwrite is updated in the block)
     if (overwriteCacheValid.add(state)) {
+      // Creates a map from a state to it's representative. Avoids self loops
       IntUnaryOperator map = successor -> {
         int representative = representative(successor);
+        // Checking if the state hasn't been removed
         assert !isRemoved(representative);
         return representative == state ? -1 : representative;
       };
 
+      // Marks a distribution as changed if the support consists of a removed state or the state itself.
       Predicate<Distribution> unchanged = d ->
           !d.containsOneOf(removedStates) && !d.contains(state);
+      // Calculates the distributions
       distributions = computeSuccessors(state, map, unchanged);
       if (distributions != null) {
+        // The below 3 lines remove any duplicate distributions
         Set<Distribution> uniqueDistributions = new HashSet<>(distributions.size());
         Predicate<Distribution> filter = uniqueDistributions::add;
         distributions.removeIf(filter.negate());
+        // The overwrite cache of state is now updated
         overwrite.put(state, distributions);
       }
     }
 
+    // Gets the distribution in case the cache is valid
     if (distributions == null) {
       distributions = overwrite.get(state);
       if (distributions == null) {
@@ -141,9 +166,13 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     }
 
     assert distributions != null;
+    // Ensures that no distribution is empty
     assert distributions.stream().noneMatch(Distribution::isEmpty);
+    // Ensures that no distribution's support consists of the state itself.
     assert distributions.stream().noneMatch(d -> d.contains(state)) : state + " " + distributions;
+    // Ensures that no distribution's support consists of a removed state
     assert distributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
+    // Ensures that all distribution's support consists of states that are their own representatives. Basically re-ensures that there are no removed states
     assert distributions.stream().map(Distribution::support).flatMap(Collection::stream)
         .allMatch(s -> s == representative(s));
 
@@ -156,6 +185,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   }
 
   @Override
+  // getChoices returns a list of distributions. getActions returns a list of actions by converting the output of getChoices
   public List<Action> getActions(int state) {
     return getChoices(state).stream().map(Action::of).collect(Collectors.toList());
   }
@@ -177,54 +207,69 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
 
 
   @Override
+  // Given a partitioning of states, collapses each partition. Returns a list of representatives
   public IntList collapse(List<? extends IntSet> stateList) {
     if (stateList.isEmpty()) {
       //noinspection AssignmentOrReturnOfFieldWithMutableType
       return IntLists.EMPTY_LIST;
     }
 
+    // Ensures that no 2 partitions intersect
     assert stateList.stream().allMatch(states ->
         stateList.stream().noneMatch(others -> !others.equals(states)
             && !Sets.intersection(states, others).isEmpty()));
 
+    // Collects all states of stateList
     NatBitSet newCollapsed = NatBitSets.set();
     stateList.forEach(newCollapsed::or);
 
-    // Only collapse states of the collapsed model
+    // Only collapse states of the collapsed mode. Ensures state list doesn't have any removed states
     assert !newCollapsed.intersects(removedStates);
 
-    // Collapse the states
+    // Collapse the states. representatives consists of the newly computed representatives
     IntList representatives = new IntArrayList(stateList.size());
     for (IntSet states : stateList) {
+      // collapse individual partition 'states'
       representatives.add(collapse(states));
     }
+    // Ensures that the class variable has all representatives. Must be added by private collapse function
     assert representativeStates.containsAll(representatives);
 
     // Representatives are consistent
+    // Ensures that the computed representative of a state lies in the same set in stateList
     assert stateList.stream().allMatch(states ->
         states.stream().mapToInt(this::representative).allMatch(states::contains));
+    // Ensures that each partition in stateList has only one representative
     assert stateList.stream().allMatch(states ->
         states.stream().mapToInt(this::representative).distinct().count() == 1L);
+    // Ensures that no 2 partitions have the same representative.
     assert stateList.stream().flatMap(Collection::stream).mapToInt(this::representative)
         .distinct().count() == stateList.size();
 
+    // Process the distributions for each partition
     for (int i = 0; i < stateList.size(); i++) {
       IntSet states = stateList.get(i);
       int representative = representatives.getInt(i);
       assert states.contains(representative)
           && representative == representative(representative);
 
+      // Set of newly calculated distributions
       Collection<Distribution> collapsedDistributions = new HashSet<>();
 
+      // Creates a map from a state to it's representative. Avoids self loops
       IntUnaryOperator map = successor -> {
         int successorRepresentative = this.representative(successor);
+        // Checking if the state hasn't been removed
         assert !removedStates.contains(successorRepresentative);
         return successorRepresentative == representative ? -1 : successorRepresentative;
       };
 
+      // Recalculating distributions
       states.forEach((int state) -> {
+        // Marks a distribution as changed if the support consists of a removed state or the state itself.
         Predicate<Distribution> unchanged = d ->
             !d.containsOneOf(removedStates) && !d.contains(representative);
+        // Recalculates the distributions
         var distributions = computeSuccessors(state, map, unchanged);
         if (distributions == null) {
           distributions = overwrite.get(state);
@@ -233,20 +278,24 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
           }
         }
         collapsedDistributions.addAll(distributions);
+        // Removes all states from overwrite cache. (Representative states are added later)
         overwrite.remove(state);
       });
 
       // No internal transitions
+      // No distribution's support consists of a removed state
       assert collapsedDistributions.stream().noneMatch(d -> d.containsOneOf(removedStates));
+      // No distribution has a self loop
       assert collapsedDistributions.stream().noneMatch(d -> d.contains(representative));
       // All states are cleared
       assert states.stream().mapToInt(Integer::intValue)
           .mapToObj(overwrite::get).allMatch(Objects::isNull);
 
+      // updating overwrite cache
       overwrite.put(representative, new ArrayList<>(collapsedDistributions));
     }
 
-    // Collapsed states are empty
+    // overwrite doesn't contain a removed state
     assert overwrite.keySet().stream().noneMatch(this::isRemoved);
 
     // Remap all transitions. Other states might be pointing to some now merged state - we have
@@ -280,6 +329,7 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
     return representatives;
   }
 
+  // collapses a single set of states. Returns a representative
   private int collapse(IntSet states) {
     assert !states.isEmpty();
     if (states.size() == 1) {
@@ -288,15 +338,20 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
       return state;
     }
     int modelStates = model.getNumStates();
+    // Expanding size of collapseUF array. (There may be newly explored states in the model)
     if (collapseUF.size() <= modelStates) {
       collapseUF.add(modelStates * 2 + 1);
     }
 
     int anyState = representative(states.iterator().nextInt());
+    // Updates collapseUF array. Does union operation for all states
     states.forEach((int state) -> collapseUF.union(anyState, state));
+    // Gets a random state as a representative
     int representative = representative(anyState);
 
+    // Remove all input states
     removedStates.or(states);
+    // Mark representative state as not removed
     removedStates.clear(representative);
     representativeStates.set(representative);
 
@@ -306,9 +361,10 @@ public class CollapseView<M extends Model> extends AbstractModel implements Coll
   @Override
   // If the state represents an MEC, then return the MEC number to which it belongs, otherwise, the state is its own representative
   public int representative(int state) {
-    if (state >= collapseUF.size()) {  // the state is its own representative
+    if (state >= collapseUF.size()) {  // the state doesn't have an entry in collapseUF, it must not have been collapsed until now and would be it's own representative
       return state;
     }
+    // Returns the parent of the state in the Union-find tree.
     return collapseUF.find(state);
   }
 

@@ -13,18 +13,22 @@ import java.util.Objects;
 import java.util.function.IntFunction;
 
 public final class Mec {
-  public final NatBitSet states;
-  public final Int2ObjectMap<IntSet> actions;
+  public final NatBitSet states; // Set of state numbers corresponding to the original model that belong to the mec
+  public final Int2ObjectMap<IntSet> actions; // Map from state to a set of indices. These indices give a subset of state's list of actions that can be obtained from the original model.
+  // This subset gives a set of actions that are a part of the mec.
 
   private Mec(NatBitSet s, Int2ObjectMap<IntSet> a) {
     states = s;
     actions = a;
   }
 
+  // Creates and returns an mec object from the given model and the given set of states.
   public static Mec create(Model model, NatBitSet states) {
     Int2ObjectMap<IntSet> actions = new Int2ObjectOpenHashMap<>(states.size());
     boolean changed = true;
 
+    // This loop iteratively removes actions that may point to a state outside the mec.
+    // Further it removes states that may not have a valid action. (All actions for a state may lie outside the given set of states.
     while (changed) {
       changed = false;
 
@@ -35,6 +39,7 @@ public final class Mec {
 
         List<Distribution> distributions = model.getChoices(state);
         int choiceCount = distributions.size();
+        // If there are no actions from a state, remove the state from the mec
         if (choiceCount == 0) {
           toRemove.set(state);
           changed = true;
@@ -42,22 +47,28 @@ public final class Mec {
         }
 
         IntFunction<IntSet> constructor = k -> NatBitSets.boundedFilledSet(choiceCount);
+        // Indices of all actions from a state. If actions map already has a value, that is returned, otherwise all indices from 0 to choiceCount-1 are returned.
         IntSet stateActions = actions.computeIfAbsent(state, constructor);
+        // Indices of actions that are to be removed (Empty for now)
         NatBitSet removeActions = NatBitSets.boundedSet(choiceCount);
 
+        // Remove an action if it's support consists of state outside the remaining states
         stateActions.forEach((int action) -> {
           if (!states.containsAll(distributions.get(action).support())) {
             removeActions.set(action);
           }
         });
+        //  changed set to true there is a removed action
         changed |= stateActions.removeAll(removeActions);
 
+        // if all of the state's actions are removed, remove the state from the mec
         if (stateActions.isEmpty()) {
           toRemove.set(state);
           stateActions.remove(state);
           changed = true;
         }
       }
+      // Do the remove operation
       states.andNot(toRemove);
     }
 

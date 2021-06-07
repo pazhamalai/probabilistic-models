@@ -18,6 +18,7 @@ import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import java.util.List;
 
 public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
+  // A mapping to and from state numbers in partial model to state object in generator.
   private final StateToIndex<S> stateMap = new StateToIndex<>();
   // All states which are in the partial model and explored
   private final IntSet exploredStates = new IntOpenHashSet();
@@ -25,6 +26,7 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
   private final Generator<S> generator;
   private final boolean removeSelfLoops;
 
+  // Creates and returns a default explorer object from a generator. Explores all initial states
   public static <S, M extends Model> DefaultExplorer<S, M> of(M model, Generator<S> generator,
       boolean removeSelfLoops) {
     DefaultExplorer<S, M> explorer = new DefaultExplorer<>(model, generator, removeSelfLoops);
@@ -55,10 +57,12 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
   }
 
   @Override
+  // Explores a state, adds it to the model and populates the distribution.
   public S exploreState(int stateId) {
     assert stateMap.check(stateId) && !isExploredState(stateId);
     exploredStates.add(stateId);
 
+    // adds a state into the partial model
     S state = stateMap.getState(stateId);
     assert state != null;
 
@@ -75,6 +79,7 @@ public class DefaultExplorer<S, M extends Model> implements Explorer<S, M> {
           builder.add(target, probability);
         }
       }
+      // scale the distribution if any values in the original support were skipped
       Distribution distribution = skippedAny ? builder.scaled() : builder.build();
       assert distribution.isEmpty() || Util.isOne(distribution.sum()) : distribution;
       model.addChoice(stateId, Action.of(distribution, choice.label()));
