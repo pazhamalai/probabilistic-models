@@ -3,6 +3,7 @@ package de.tum.in.probmodels.explorer;
 import de.tum.in.probmodels.generator.Generator;
 import de.tum.in.probmodels.model.Model;
 
+// Wrapper class to return whitebox/blackbox explorers
 public class Explorers {
   private Explorers(){
 
