@@ -39,6 +39,10 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   // restore the original set of actions after deactivateActionCountFilter() is called.
   private final Int2ObjectMap<List<Action>> unfilteredActionsCache = new Int2ObjectOpenHashMap<>();
 
+  // This holds a mapping from the indices of actions in the filtered model to the indices in the filtered model.
+  // This helps during to update counts when the model is filtered.
+  private final Int2ObjectMap<Int2IntMap> unfilteredActionIndexMap = new Int2ObjectOpenHashMap<>();
+
   private int exploredActionsCount = 0;
   private boolean actionCountFilterActive = false;
   private double actionCountFilter;
@@ -102,6 +106,9 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    * @param update
    */
   public boolean updateCounts(int state, int actionIndex, int successor, boolean update){
+    if (actionCountFilterActive) {
+      actionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
+    }
     Int2IntMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
     transitionCounts.put(successor, transitionCounts.getOrDefault(successor, 0)+1);
 
@@ -126,7 +133,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       model.setActions(state, currActions);
     }
 
-    stateActionChange.get(state).put(actionIndex, true);
+    stateActionChange.get(state).put(actionIndex, !update);
 
     return newTrans;
   }
@@ -137,6 +144,9 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    * @return Returns the number of times a state action pair has been sampled.
    */
   public int getActionCounts(int stateId, int actionIndex){
+    if (actionCountFilterActive) {
+      actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
+    }
     Int2IntMap transitionCounts = stateTransitionCounts.get(stateId).get(actionIndex);
     return transitionCounts.values().stream().mapToInt(s -> s).sum();
   }
@@ -179,6 +189,9 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     for (int stateId: exploredStates) {
       List<Action> actionList = new ArrayList<>();
       for (int actionIndex=0; actionIndex<stateTransitionCounts.get(stateId).size(); actionIndex++){
+        if (actionCountFilterActive) {
+          actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
+        }
         Action action = model.getActions(stateId).get(actionIndex);
         if (changed.test(stateId, actionIndex)) {
 
@@ -200,9 +213,12 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
     updateModel((stateId, actionIndex) -> stateActionChange.get((int) stateId).get((int) actionIndex));
 
-    for (int key: stateActionChange.keySet()){
+    for (int stateId: stateActionChange.keySet()){
       for (int actionIndex=0; actionIndex<stateActionChange.size(); actionIndex++) {
-        stateActionChange.get(key).put(actionIndex, false);
+        if (actionCountFilterActive) {
+          actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
+        }
+        stateActionChange.get(stateId).put(actionIndex, false);
       }
     }
 
@@ -275,9 +291,40 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    * @param actionIndex: index of the action corresponding to the model variable.
    * @return StateID of the sampled successor state.
    */
-  public int sampleState(int stateId, int actionIndex){
+  public int simulateAction(int stateId, int actionIndex){
+    if (actionCountFilterActive) {
+      actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
+    }
     Action action = stateActions.get(stateId).get(actionIndex);
     return action.distribution().sample();
+  }
+
+  public void simulateActionRepeatedly(int stateId, int filteredIndex, double requiredSamples){
+    int realIndex = filteredIndex;
+    if (actionCountFilterActive) {
+      realIndex = unfilteredActionIndexMap.get(stateId).get(filteredIndex);
+    }
+    Action action = stateActions.get(stateId).get(realIndex);
+    int actionCounts = getActionCounts(stateId, realIndex);
+    Int2IntMap actionTransitionCounts = new Int2IntOpenHashMap();
+    for(int succ: action.distribution().support()) {
+      actionTransitionCounts.put(succ, 0);
+    }
+    while (actionCounts<requiredSamples) {
+      int succ = action.distribution().sample();
+      actionTransitionCounts.put(succ, actionTransitionCounts.get(succ)+1);
+      actionCounts++;
+    }
+    for(int succ: action.distribution().support()) {
+      int currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
+      stateTransitionCounts.get(stateId).get(realIndex)
+              .put(succ, currValue+actionTransitionCounts.get(succ));
+    }
+    List<Action> currActions = model.getActions(stateId);
+    Distribution distribution = getDistributionFromCounts(stateId, stateTransitionCounts.get(stateId).get(realIndex));
+    currActions.set(filteredIndex, Action.of(distribution, action.label()));
+
+    model.setActions(stateId, currActions);
   }
 
   /**
@@ -286,12 +333,11 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    */
   public void activateActionCountFilter(){
 
-    actionCountFilterActive = true;
-
     for (int i: exploredStates) {
       unfilteredActionsCache.put(i, model.getActions(i));
-      model.setActions(i, getActions(i));
+      model.setActions(i, filterActions(i));
     }
+    actionCountFilterActive = true;
   }
 
   /**
@@ -305,6 +351,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     }
 
     unfilteredActionsCache.clear();
+    unfilteredActionIndexMap.clear();
   }
 
   @Override
@@ -347,45 +394,36 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   @Override
   public List<Distribution> getChoices(int stateId) {
     assert isExploredState(stateId);
-    List<Distribution> choices = model.getChoices(stateId);
-    if (actionCountFilterActive) {
-      List<Distribution> finalChoices = new ArrayList<>();
 
-      for (int i = 0; i < choices.size(); i++) {
-        if(getActionCounts(stateId, i) > actionCountFilter){
-          finalChoices.add(choices.get(i));
-        }
-      }
-
-      choices = finalChoices;
-    }
-
-    return choices;
+    return model.getChoices(stateId);
   }
 
   /**
    * Returns a list of actions for a state. If actionCountFilter is active, only those actions are added which have been
-   * sampled more than actionCountFilter number of times.
+   * sampled more than actionCountFilter number of times. unfilteredActionIndexMap is also populated.
    * @param stateId
    * @return a list of actions.
    */
   @Override
   public List<Action> getActions(int stateId) {
     assert isExploredState(stateId);
+
+    return model.getActions(stateId);
+  }
+
+  public List<Action> filterActions(int stateId) {
     List<Action> actions = model.getActions(stateId);
-    if (actionCountFilterActive) {
-      List<Action> finalActions = new ArrayList<>();
+    List<Action> finalActions = new ArrayList<>();
+    unfilteredActionIndexMap.put(stateId, new Int2IntOpenHashMap());
 
-      for (int i = 0; i < actions.size(); i++) {
-        if(getActionCounts(stateId, i) > actionCountFilter){
-          finalActions.add(actions.get(i));
-        }
+    for (int i = 0; i < actions.size(); i++) {
+      if(getActionCounts(stateId, i) > actionCountFilter){
+        unfilteredActionIndexMap.get(stateId).put(finalActions.size(), i);
+        finalActions.add(actions.get(i));
       }
-
-      actions = finalActions;
     }
 
-    return actions;
+    return finalActions;
   }
 
   @Override
