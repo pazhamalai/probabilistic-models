@@ -18,7 +18,8 @@ public class Explorers {
       return DefaultExplorer.of(partialModel, generator, removeSelfLoops);
     }
     else {
-      throw new UnsupportedOperationException("Only models with Blackbox and Whitebox information levels are supported at the moment.");
+      //TODO change code
+      return BlackExplorer.of(partialModel, generator, removeSelfLoops);
     }
   }
 }
