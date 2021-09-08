@@ -437,30 +437,4 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     return String.format("DefaultExplorer(%s, %s, %s)", model.getClass(), generator,
             removeSelfLoops ? "inline" : "normal");
   }
-
-  // TODO this method should not be accessed by any black box code.
-  // TODO better to move outside.
-  /**
-   * Given a state and an action, this method returns the actual number of successors belonging to the action.
-   *
-   * @param stateId
-   * @param action Maybe a partially explored action object
-   * @return integer
-   */
-  public int getActualSuccessorsOfStateAction(int stateId, Action action) {
-    assert action != null;
-
-    // We find the same action in stateActions variable.
-    // The comparison is done only on action labels, because calling action1.equals(action) will check distributions too.
-    // Since one action is partially explored, distributions may not be equal.
-    Action actualAction = stateActions.get(stateId).stream()
-            .filter(action1 -> Objects.equals(action1.label(), action.label()))
-            .findAny()
-            .orElse(null);
-
-    assert actualAction != null;
-    assert actualAction.distribution() != null;
-
-    return actualAction.distribution().size();
-  }
 }

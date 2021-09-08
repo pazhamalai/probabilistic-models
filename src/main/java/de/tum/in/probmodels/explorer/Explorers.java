@@ -3,7 +3,7 @@ package de.tum.in.probmodels.explorer;
 import de.tum.in.probmodels.generator.Generator;
 import de.tum.in.probmodels.model.Model;
 
-// Wrapper class to return whitebox/blackbox explorers
+// Wrapper class to return whitebox/blackbox/greybox explorers
 public class Explorers {
   private Explorers(){
 
@@ -18,8 +18,7 @@ public class Explorers {
       return DefaultExplorer.of(partialModel, generator, removeSelfLoops);
     }
     else {
-      //TODO change code
-      return BlackExplorer.of(partialModel, generator, removeSelfLoops);
+      return GreyExplorer.of(partialModel, generator, removeSelfLoops);
     }
   }
 }
