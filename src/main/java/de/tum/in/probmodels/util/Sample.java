@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public final class Sample {
@@ -106,5 +107,9 @@ public final class Sample {
       return null;
     }
     return size == 1 ? values.get(0) : values.get(random.nextInt(size));
+  }
+
+  public static double sampleExponential(double lambda) {
+    return Math.log(1-random.nextDouble())/(-lambda);
   }
 }

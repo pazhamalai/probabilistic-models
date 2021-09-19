@@ -20,20 +20,20 @@ import java.util.function.BiPredicate;
  */
 public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   // A mapping to and from state numbers in partial model to state object in generator.
-  private final StateToIndex<S> stateMap = new StateToIndex<>();
+  protected final StateToIndex<S> stateMap = new StateToIndex<>();
   // All states which are in the partial model and explored
-  private final IntSet exploredStates = new IntOpenHashSet();
-  private final M model;
-  private final Generator<S> generator;
-  private final boolean removeSelfLoops;
+  protected final IntSet exploredStates = new IntOpenHashSet();
+  protected final M model;
+  protected final Generator<S> generator;
+  protected final boolean removeSelfLoops;
 
   // This holds the counts for haw many times every state-action-successor triplet has been sampled. They can be accessed
   // by first using the stateIndex and then the actionIndex as keys.
-  private final Int2ObjectMap<ObjectArrayList<Int2IntMap>> stateTransitionCounts = new Int2ObjectOpenHashMap<>();
+  protected final Int2ObjectMap<ObjectArrayList<Int2IntMap>> stateTransitionCounts = new Int2ObjectOpenHashMap<>();
   // This holds the real set of actions for the model. Successors are sampled using these distributions.
-  private final Int2ObjectMap<ObjectArrayList<Action>> stateActions = new Int2ObjectOpenHashMap<>();
+  protected final Int2ObjectMap<ObjectArrayList<Action>> stateActions = new Int2ObjectOpenHashMap<>();
   // This holds whether the counts of a state-action pair have been changed or not.
-  private final Int2ObjectMap<Int2BooleanMap> stateActionChange = new Int2ObjectOpenHashMap<>();
+  protected final Int2ObjectMap<Int2BooleanMap> stateActionChange = new Int2ObjectOpenHashMap<>();
 
   // This holds all the actions of the model regardless of whether they pass the actionCountFilter. They are used to
   // restore the original set of actions after deactivateActionCountFilter() is called.
@@ -41,13 +41,13 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
   // This holds a mapping from the indices of actions in the filtered model to the indices in the filtered model.
   // This helps during to update counts when the model is filtered.
-  private final Int2ObjectMap<Int2IntMap> unfilteredActionIndexMap = new Int2ObjectOpenHashMap<>();
+  protected final Int2ObjectMap<Int2IntMap> unfilteredActionIndexMap = new Int2ObjectOpenHashMap<>();
 
-  private int exploredActionsCount = 0;
-  private boolean actionCountFilterActive = false;
-  private double actionCountFilter;
+  protected int exploredActionsCount = 0;
+  protected boolean actionCountFilterActive = false;
+  protected double actionCountFilter;
 
-  private int numTrans = 0;
+  protected int numTrans = 0;
 
   // Creates and returns a default explorer object from a generator. Explores all initial states
   public static <S, M extends Model> BlackExplorer<S, M> of(M model, Generator<S> generator,
@@ -156,7 +156,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    * @param transitionCounts
    * @return Returns the distribution of an action for a state from the transitionCounts.
    */
-  private Distribution getDistributionFromCounts(int stateId, Int2IntMap transitionCounts){
+  protected Distribution getDistributionFromCounts(int stateId, Int2IntMap transitionCounts){
 
     double actionCounts = transitionCounts.values().stream().mapToInt(s -> s).sum();
 
