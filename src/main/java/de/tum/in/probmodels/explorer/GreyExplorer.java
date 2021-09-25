@@ -8,6 +8,7 @@ import de.tum.in.probmodels.util.Util;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -38,6 +39,51 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
     private int exploredActionsCount = 0;
 
     private int numTrans = 0;
+
+    private final Int2ObjectMap<List<Action>> unfilteredActionsCache = new Int2ObjectOpenHashMap<>();
+
+    private final Int2ObjectMap<Int2IntMap> unfilteredActionIndexMap = new Int2ObjectOpenHashMap<>();
+
+    private boolean isFullyExploredActionFlag = false;
+
+    public void activateFullyExploredActionsModel() {
+        for (int i : exploredStates) {
+            unfilteredActionsCache.put(i, getActions(i));
+            model.setActions(i, filterActions(i));
+        }
+
+        isFullyExploredActionFlag = true;
+    }
+
+    public void deactivateFullyExploredActionsModel() {
+        isFullyExploredActionFlag = false;
+
+        for (int i: exploredStates){
+            model.setActions(i, unfilteredActionsCache.get(i));
+        }
+
+        unfilteredActionsCache.clear();
+        unfilteredActionIndexMap.clear();
+    }
+
+    private List<Action> filterActions(int state) {
+        List<Action> actions = getActions(state);
+        List<Action> filteredActions = new ArrayList<>();
+        unfilteredActionIndexMap.put(state, new Int2IntOpenHashMap());
+
+        for (int i = 0; i < actions.size(); i++) {
+            if (actions.get(i).distribution().size() == 0) {
+                continue;
+            }
+
+            if (isStateActionExplored(state, i)) {
+                unfilteredActionIndexMap.get(state).put(filteredActions.size(), i);
+                filteredActions.add(actions.get(i));
+            }
+        }
+
+        return filteredActions;
+    }
 
     // Creates and returns a default explorer object from a generator. Explores all initial states
     public static <S, M extends Model> GreyExplorer<S, M> of(M model, Generator<S> generator,
@@ -84,7 +130,14 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
 
     public void updateCounts(int state, int actionIndex, int successor) {
 
+        // TODO this might not be needed. Check.
+        if (isFullyExploredActionFlag) {
+            actionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
+        }
+
         int newTransitionCount = incrementTransitionCount(state, actionIndex, successor);
+
+//        Logger.getLogger("GreyExplorer").log(Level.INFO, state + " " + actionIndex + " " + successor + " " + newTransitionCount);
 
         updateStateActionDistributionInModel(state, actionIndex);
 
@@ -93,7 +146,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
             numTrans++;
 
             // We update whether this action is fully explored.
-            isNewFullyExploredActionAvailable = isStateActionExplored(state, actionIndex);
+            isNewFullyExploredActionAvailable = true;
         }
     }
 
@@ -101,6 +154,9 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
      * @return Returns the number of times a state action pair has been sampled.
      */
     public int getActionCounts(int stateId, int actionIndex) {
+        if (isFullyExploredActionFlag) {
+            actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
+        }
         Int2IntMap transitionCounts = stateTransitionCounts.get(stateId).get(actionIndex);
         return transitionCounts.values().stream().mapToInt(s -> s).sum();
     }
@@ -198,29 +254,38 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
      * @return StateID of the sampled successor state.
      */
     public int simulateAction(int stateId, int actionIndex) {
+        if (isFullyExploredActionFlag) {
+            actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
+        }
         Action action = stateActions.get(stateId).get(actionIndex);
         return action.distribution().sample();
     }
 
+    // TODO this method itself might not be needed. Because greybox doesn't require actions to be visited
+    // TODO requiredSample number of times
     public void simulateActionRepeatedly(int stateId, int filteredIndex, double requiredSamples) {
-        Action action = stateActions.get(stateId).get(filteredIndex);
-        int actionCounts = getActionCounts(stateId, filteredIndex);
+        int realIndex = filteredIndex;
+        if (isFullyExploredActionFlag) {
+            realIndex = unfilteredActionIndexMap.get(stateId).get(filteredIndex);
+        }
+        Action action = stateActions.get(stateId).get(realIndex);
+        int actionCounts = getActionCounts(stateId, realIndex);
         Int2IntMap actionTransitionCounts = new Int2IntOpenHashMap();
-        for (int succ : action.distribution().support()) {
+        for(int succ: action.distribution().support()) {
             actionTransitionCounts.put(succ, 0);
         }
-        while (actionCounts < requiredSamples) {
+        while (actionCounts<requiredSamples) {
             int succ = action.distribution().sample();
-            actionTransitionCounts.put(succ, actionTransitionCounts.get(succ) + 1);
+            actionTransitionCounts.put(succ, actionTransitionCounts.get(succ)+1);
             actionCounts++;
         }
-        for (int succ : action.distribution().support()) {
-            int currValue = stateTransitionCounts.get(stateId).get(filteredIndex).get(succ);
-            stateTransitionCounts.get(stateId).get(filteredIndex)
-                    .put(succ, currValue + actionTransitionCounts.get(succ));
+        for(int succ: action.distribution().support()) {
+            int currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
+            stateTransitionCounts.get(stateId).get(realIndex)
+                    .put(succ, currValue+actionTransitionCounts.get(succ));
         }
         List<Action> currActions = model.getActions(stateId);
-        Distribution distribution = getDistributionFromCounts(stateId, stateTransitionCounts.get(stateId).get(filteredIndex));
+        Distribution distribution = getDistributionFromCounts(stateId, stateTransitionCounts.get(stateId).get(realIndex));
         currActions.set(filteredIndex, Action.of(distribution, action.label()));
 
         model.setActions(stateId, currActions);
