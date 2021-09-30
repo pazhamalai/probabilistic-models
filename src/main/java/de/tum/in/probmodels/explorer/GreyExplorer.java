@@ -146,7 +146,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
             numTrans++;
 
             // We update whether this action is fully explored.
-            isNewFullyExploredActionAvailable = true;
+            isNewFullyExploredActionAvailable = isNewFullyExploredActionAvailable || isStateActionExplored(state, actionIndex);
         }
     }
 

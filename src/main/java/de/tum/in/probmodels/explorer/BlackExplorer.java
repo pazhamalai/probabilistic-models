@@ -10,7 +10,6 @@ import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.BiPredicate;
 
 /**
@@ -49,6 +48,14 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   private double actionCountFilter;
 
   private int numTrans = 0;
+
+  public Int2ObjectMap<ObjectArrayList<Int2IntMap>> getStateTransitionCounts() {
+    return stateTransitionCounts;
+  }
+
+  public Int2ObjectMap<ObjectArrayList<Action>> getStateActions() {
+    return stateActions;
+  }
 
   // Creates and returns a default explorer object from a generator. Explores all initial states
   public static <S, M extends Model> BlackExplorer<S, M> of(M model, Generator<S> generator,
