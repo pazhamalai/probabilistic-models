@@ -53,7 +53,8 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     return stateTransitionCounts;
   }
 
-  public Int2ObjectMap<ObjectArrayList<Action>> getStateActions() {
+  // It returns the original state actions as per the MDP.
+  public Int2ObjectMap<ObjectArrayList<Action>> getOriginalStateActions() {
     return stateActions;
   }
 
