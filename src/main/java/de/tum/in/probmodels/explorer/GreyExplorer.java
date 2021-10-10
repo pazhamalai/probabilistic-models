@@ -130,7 +130,6 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
 
     public void updateCounts(int state, int actionIndex, int successor) {
 
-        // TODO this might not be needed. Check.
         if (isFullyExploredActionFlag) {
             actionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
         }
@@ -261,8 +260,6 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
         return action.distribution().sample();
     }
 
-    // TODO this method itself might not be needed. Because greybox doesn't require actions to be visited
-    // TODO requiredSample number of times
     public void simulateActionRepeatedly(int stateId, int filteredIndex, double requiredSamples) {
         int realIndex = filteredIndex;
         if (isFullyExploredActionFlag) {
