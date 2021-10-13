@@ -123,6 +123,9 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
         return numTrans;
     }
 
+    public int getOriginalNumOfSuccessors(int state, int action) {
+        return stateActions.get(state).get(action).distribution().support().size();
+    }
     /**
      * Update sampled counts for a state-action-successor triplet. If update is true, the learned distributions are
      * immediately updated. Returns whether a new action has been sampled more than actionCountFilter number of times.
