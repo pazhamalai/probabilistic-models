@@ -32,7 +32,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
 
     // This holds the counts for haw many times every state-action-successor triplet has been sampled. They can be accessed
     // by first using the stateIndex and then the actionIndex as keys.
-    private final Int2ObjectMap<ObjectArrayList<Int2IntMap>> stateTransitionCounts = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<ObjectArrayList<Int2LongMap>> stateTransitionCounts = new Int2ObjectOpenHashMap<>();
     // This holds the real set of actions for the model. Successors are sampled using these distributions.
     private final Int2ObjectMap<ObjectArrayList<Action>> stateActions = new Int2ObjectOpenHashMap<>();
 
@@ -137,7 +137,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
             actionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
         }
 
-        int newTransitionCount = incrementTransitionCount(state, actionIndex, successor);
+        long newTransitionCount = incrementTransitionCount(state, actionIndex, successor);
 
 //        Logger.getLogger("GreyExplorer").log(Level.INFO, state + " " + actionIndex + " " + successor + " " + newTransitionCount);
 
@@ -155,20 +155,20 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
     /**
      * @return Returns the number of times a state action pair has been sampled.
      */
-    public int getActionCounts(int stateId, int actionIndex) {
+    public long getActionCounts(int stateId, int actionIndex) {
         if (isFullyExploredActionFlag) {
             actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
         }
-        Int2IntMap transitionCounts = stateTransitionCounts.get(stateId).get(actionIndex);
-        return transitionCounts.values().stream().mapToInt(s -> s).sum();
+        Int2LongMap transitionCounts = stateTransitionCounts.get(stateId).get(actionIndex);
+        return transitionCounts.values().stream().mapToLong(s -> s).sum();
     }
 
     /**
      * @return Returns the distribution of an action for a state from the transitionCounts.
      */
-    private Distribution getDistributionFromCounts(int stateId, Int2IntMap transitionCounts) {
+    private Distribution getDistributionFromCounts(int stateId, Int2LongMap transitionCounts) {
 
-        double actionCounts = transitionCounts.values().stream().mapToInt(s -> s).sum();
+        double actionCounts = transitionCounts.values().stream().mapToLong(s -> s).sum();
 
         DistributionBuilder builder = Distributions.defaultBuilder();
 
@@ -198,7 +198,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
         S state = stateMap.getState(stateId);
         assert state != null;
 
-        ObjectArrayList<Int2IntMap> stateActionCounts = new ObjectArrayList<>();
+        ObjectArrayList<Int2LongMap> stateActionCounts = new ObjectArrayList<>();
         ObjectArrayList<Action> stateChoices = new ObjectArrayList<>();
 
         for (Choice<S> choice : generator.choices(state)) {
@@ -220,7 +220,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
             // Real distribution added to stateChoices
             stateChoices.add(Action.of(distribution, choice.label()));
 
-            Int2IntMap actionCounts = new Int2IntOpenHashMap();
+            Int2LongMap actionCounts = new Int2LongOpenHashMap();
             stateActionCounts.add(actionCounts);
 
             // Empty distribution added to model
@@ -269,7 +269,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
             realIndex = unfilteredActionIndexMap.get(stateId).get(filteredIndex);
         }
         Action action = stateActions.get(stateId).get(realIndex);
-        int actionCounts = getActionCounts(stateId, realIndex);
+        long actionCounts = getActionCounts(stateId, realIndex);
         Int2IntMap actionTransitionCounts = new Int2IntOpenHashMap();
         for(int succ: action.distribution().support()) {
             actionTransitionCounts.put(succ, 0);
@@ -280,7 +280,7 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
             actionCounts++;
         }
         for(int succ: action.distribution().support()) {
-            int currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
+            long currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
             stateTransitionCounts.get(stateId).get(realIndex)
                     .put(succ, currValue+actionTransitionCounts.get(succ));
         }
@@ -399,16 +399,16 @@ public class GreyExplorer<S, M extends Model> implements Explorer<S, M> {
         isNewFullyExploredActionAvailable = false;
     }
 
-    private int incrementTransitionCount(int state, int actionIndex, int successor) {
-        Int2IntMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
+    private long incrementTransitionCount(int state, int actionIndex, int successor) {
+        Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
 
-        int newTransitionCount = transitionCounts.getOrDefault(successor, 0) + 1;
+        long newTransitionCount = transitionCounts.getOrDefault(successor, 0) + 1;
         transitionCounts.put(successor, newTransitionCount);
         return newTransitionCount;
     }
 
     private void updateStateActionDistributionInModel(int state, int actionIndex) {
-        Int2IntMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
+        Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
 
         List<Action> currActions = model.getActions(state);
         Action currAction = currActions.get(actionIndex);

@@ -52,7 +52,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     if (actionCountFilterActive) {
       actionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
     }
-    Int2IntMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
+    Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
     transitionCounts.put(successor, transitionCounts.getOrDefault(successor, 0)+1);
 
     boolean newTrans = false;
@@ -61,7 +61,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       numTrans++;
     }
 
-    int actionCount = getActionCounts(state, actionIndex);
+    long actionCount = getActionCounts(state, actionIndex);
     if(actionCount>actionCountFilter && actionCount-1<=actionCountFilter){
       newTrans = true;
     }
@@ -90,7 +90,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       realIndex = unfilteredActionIndexMap.get(stateId).get(filteredIndex);
     }
     Action action = stateActions.get(stateId).get(realIndex);
-    int actionCounts = getActionCounts(stateId, realIndex);
+    long actionCounts = getActionCounts(stateId, realIndex);
     Int2IntMap actionTransitionCounts = new Int2IntOpenHashMap();
     Int2ObjectMap<DoubleArrayList> actionTransitionTimes = new Int2ObjectOpenHashMap<>();
     for(int succ: action.distribution().support()) {
@@ -105,7 +105,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       actionCounts++;
     }
     for(int succ: action.distribution().support()) {
-      int currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
+      long currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
       stateTransitionCounts.get(stateId).get(realIndex)
           .put(succ, currValue+actionTransitionCounts.get(succ));
       stateTransitionTimes.get(stateId).get(realIndex).get(succ).addAll(actionTransitionTimes.get(succ));
@@ -126,7 +126,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     S state = stateMap.getState(stateId);
     assert state != null;
 
-    ObjectArrayList<Int2IntMap> stateActionCounts = new ObjectArrayList<>();
+    ObjectArrayList<Int2LongMap> stateActionCounts = new ObjectArrayList<>();
     ObjectArrayList<Action> stateChoices = new ObjectArrayList<>();
 
     ObjectArrayList<Int2ObjectMap<DoubleArrayList>> stateTransitionTimes = new ObjectArrayList<>();
@@ -149,7 +149,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       stateChoices.add(Action.of(distribution, choice.label()));
       stateTransitionRates.add(rateMap);
 
-      stateActionCounts.add(new Int2IntOpenHashMap());
+      stateActionCounts.add(new Int2LongOpenHashMap());
       stateTransitionTimes.add(new Int2ObjectOpenHashMap<>());
 
       // Empty distribution added to model
