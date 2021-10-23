@@ -9,6 +9,9 @@ import java.util.Map;
 import java.util.Set;
 
 // This class holds info about mec states, actions and the uniformized rates of every transition.
+// TODO add action label information
+// TODO OR STORE IT AS ACTION OBJECT ITSELF
+// TODO Represent it as MDP object
 public class UniformizedMEC {
     private final NatBitSet states;
     private final Int2ObjectMap<IntSet> actions;
