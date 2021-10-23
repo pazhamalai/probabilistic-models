@@ -14,7 +14,7 @@ import java.util.List;
 
 public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
 
-  private final Int2ObjectMap<ObjectArrayList<Int2ObjectMap<DoubleArrayList>>> stateTransitionTimes = new Int2ObjectOpenHashMap<>();
+  public final Int2ObjectMap<ObjectArrayList<Int2ObjectMap<DoubleArrayList>>> stateTransitionTimes = new Int2ObjectOpenHashMap<>();
   private final Int2ObjectMap<ObjectArrayList<Int2DoubleMap>> stateTransitionRates = new Int2ObjectOpenHashMap<>();
 
   public static <S, M extends Model> CTMDPBlackExplorer<S, M> of(M model, Generator<S> generator,
