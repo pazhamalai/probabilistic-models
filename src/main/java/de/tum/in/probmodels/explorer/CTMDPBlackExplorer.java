@@ -14,8 +14,9 @@ import java.util.List;
 
 public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
 
-  public final Int2ObjectMap<ObjectArrayList<Int2ObjectMap<DoubleArrayList>>> stateTransitionTimes = new Int2ObjectOpenHashMap<>();
   private final Int2ObjectMap<ObjectArrayList<Int2DoubleMap>> stateTransitionRates = new Int2ObjectOpenHashMap<>();
+
+  public final Int2ObjectMap<Int2ObjectMap<DoubleArrayList>> transitionTimes = new Int2ObjectOpenHashMap<>();
 
   public static <S, M extends Model> CTMDPBlackExplorer<S, M> of(M model, Generator<S> generator,
                                                                  boolean removeSelfLoops) {
@@ -77,8 +78,9 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     }
 
     stateActionChange.get(state).put(actionIndex, !update);
-    double stayTime = Sample.sampleExponential(stateTransitionRates.get(state).get(actionIndex).get(successor));
-    stateTransitionTimes.get(state).get(actionIndex).get(successor).add(stayTime);
+
+    double stayTime = Sample.sampleExponential(stateTransitionRates.get(state).get(actionIndex).values().stream().reduce(0d, Double::sum));
+    transitionTimes.get(state).get(actionIndex).add(stayTime);
 
     return newTrans;
   }
@@ -92,23 +94,21 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     Action action = stateActions.get(stateId).get(realIndex);
     long actionCounts = getActionCounts(stateId, realIndex);
     Int2IntMap actionTransitionCounts = new Int2IntOpenHashMap();
-    Int2ObjectMap<DoubleArrayList> actionTransitionTimes = new Int2ObjectOpenHashMap<>();
+    Int2ObjectMap<DoubleArrayList> stateTransitionTimes = transitionTimes.get(stateId);
     for(int succ: action.distribution().support()) {
       actionTransitionCounts.put(succ, 0);
-      actionTransitionTimes.put(succ, new DoubleArrayList());
     }
     while (actionCounts<requiredSamples) {
       int succ = action.distribution().sample();
       actionTransitionCounts.put(succ, actionTransitionCounts.get(succ)+1);
       double stayTime = Sample.sampleExponential(stateTransitionRates.get(stateId).get(realIndex).get(succ));
-      actionTransitionTimes.get(succ).add(stayTime);
+      stateTransitionTimes.get(realIndex).add(stayTime);
       actionCounts++;
     }
     for(int succ: action.distribution().support()) {
       long currValue = stateTransitionCounts.get(stateId).get(realIndex).get(succ);
       stateTransitionCounts.get(stateId).get(realIndex)
           .put(succ, currValue+actionTransitionCounts.get(succ));
-      stateTransitionTimes.get(stateId).get(realIndex).get(succ).addAll(actionTransitionTimes.get(succ));
     }
     List<Action> currActions = model.getActions(stateId);
     Distribution distribution = getDistributionFromCounts(stateId, stateTransitionCounts.get(stateId).get(realIndex));
@@ -129,19 +129,30 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     ObjectArrayList<Int2LongMap> stateActionCounts = new ObjectArrayList<>();
     ObjectArrayList<Action> stateChoices = new ObjectArrayList<>();
 
-    ObjectArrayList<Int2ObjectMap<DoubleArrayList>> stateTransitionTimes = new ObjectArrayList<>();
+    Int2ObjectMap<DoubleArrayList> stateTransitionTimes = new Int2ObjectOpenHashMap<>();
     ObjectArrayList<Int2DoubleMap> stateTransitionRates = new ObjectArrayList<>();
 
+    int actionCount = -1;
     for (Choice<S> choice : generator.choices(state)) {
+      actionCount++;
       DistributionBuilder builder = Distributions.defaultBuilder();
       Int2DoubleMap rateMap = new Int2DoubleOpenHashMap();
 
+      double rateSum = 0d;
       for (Object2DoubleMap.Entry<S> transition : choice.transitions().object2DoubleEntrySet()) {
         int target = getStateId(transition.getKey());
         double rate = transition.getDoubleValue();
         rateMap.put(target, rate);
-        builder.add(target, rate);
+        rateSum += rate;
       }
+
+      for (Object2DoubleMap.Entry<S> transition : choice.transitions().object2DoubleEntrySet()) {
+        int target = getStateId(transition.getKey());
+        double rate = transition.getDoubleValue();
+        builder.add(target, rate/rateSum);
+      }
+
+      stateTransitionTimes.put(actionCount, new DoubleArrayList());
       // scale the distribution if any values in the original support were skipped
       Distribution distribution = builder.scaled();
       assert distribution.isEmpty() || Util.isOne(distribution.sum()) : distribution;
@@ -150,7 +161,6 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       stateTransitionRates.add(rateMap);
 
       stateActionCounts.add(new Int2LongOpenHashMap());
-      stateTransitionTimes.add(new Int2ObjectOpenHashMap<>());
 
       // Empty distribution added to model
       DistributionBuilder emptyBuilder = Distributions.defaultBuilder();
@@ -161,7 +171,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     stateActions.put(stateId, stateChoices);
     stateActionChange.put(stateId, new Int2BooleanOpenHashMap());
 
-    this.stateTransitionTimes.put(stateId, stateTransitionTimes);
+    this.transitionTimes.put(stateId, stateTransitionTimes);
     this.stateTransitionRates.put(stateId, stateTransitionRates);
 
     exploredActionsCount += stateChoices.size();
