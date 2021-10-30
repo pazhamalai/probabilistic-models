@@ -53,8 +53,14 @@ public class MecUniformizer {
             uniformizedMecBuilder.addUniformizedTransition(state, action, successor, uniformizedRate);
         }
 
+
         if (!hasSelfLoop) {
-            uniformizedMecBuilder.addUniformizedTransition(state, action, state, 1-rateToMaxRate);
+            double selfLoopUniformizedRate = computeUniformizedRate(rateToMaxRate, 0d, true);
+
+            // If rateToMaxRate is equal to 1, then the self loop will be of probability 0. Hence, we ignore it.
+            if (selfLoopUniformizedRate > 0d) {
+                uniformizedMecBuilder.addUniformizedTransition(state, action, state, selfLoopUniformizedRate);
+            }
         }
     }
 
