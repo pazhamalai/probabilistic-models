@@ -8,6 +8,7 @@ import de.tum.in.probmodels.util.Sample;
 import de.tum.in.probmodels.util.Util;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
+import prism.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -342,7 +343,11 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     model.setActions(stateId, currActions);
   }
 
-  public void simulateRepeatedly(Mec mec, double requiredSamples) {
+  /**
+   * We simulate every state-action pair, individually till it reaches requiredSample number of times.
+   * Does not follow the transition rules of model.
+   */
+  public void simulateMECRepeatedly1(Mec mec, double requiredSamples) {
     for(int state: mec.actions.keySet()) {
       for(int actionInd: mec.actions.get(state)) {
         if (model().getChoice(state, actionInd).size()<2) {
@@ -353,7 +358,13 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     }
   }
 
-  public void simulateMECRepeatedly(Mec mec, double requiredSamples, double nTransitions) {
+  /**
+   * We simulate MEC in exactly requiredSamples * nTransitions steps. After simulation, there can be state-action pairs
+   * that hasn't been visited requiredSamples number of times.
+   *
+   * Actions are chosen in random.
+   */
+  public void simulateMECRepeatedly2(Mec mec, double requiredSamples, double nTransitions) {
     double nSimulations = Math.min(1e8, requiredSamples * nTransitions);
 
     int simulationCount = 0;
@@ -364,11 +375,76 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       IntSet actions = mec.actions.get(currentState);
       List<Integer> intActions = actions.stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
       int actionIndex = intActions.get(random.nextInt(actions.size()));
-      int successor = stateActions.get(currentState).get(actionIndex).distribution().sample();
+      int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
+      int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
       updateCounts(currentState, actionIndex, successor, true);
       currentState = successor;
       simulationCount++;
     }
+  }
+
+  /**
+   * We simulate MEC, until all the state-action pairs has been visited requiredSample number of times. Actions are
+   * chosen randomly.
+   */
+  public void simulateMECRepeatedly3(Mec mec, double requiredSamples) {
+    int currentState = mec.states.firstInt();
+    Random random = new Random();
+    Int2ObjectMap<Int2LongMap> stateActionCounts = getAllStateActionCounts(mec);
+
+    Pair<Integer, Integer> leastStateAction = getLeastVisitedStateAction(mec);
+    int leastVisitedState = leastStateAction.first;
+    int leastVisitedAction = leastStateAction.second;
+
+    boolean runSimulation = stateActionCounts.get(leastVisitedState).get(leastVisitedAction) < requiredSamples;
+
+    while (runSimulation) {
+      IntSet actions = mec.actions.get(currentState);
+      List<Integer> intActions = actions.stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
+      int actionIndex = intActions.get(random.nextInt(actions.size()));
+      int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
+      int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
+      updateCounts(currentState, actionIndex, successor, true);
+      currentState = successor;
+
+      if (stateActionCounts.get(leastVisitedState).get(leastVisitedAction) >= requiredSamples) {
+        leastStateAction = getLeastVisitedStateAction(mec);
+        leastVisitedState = leastStateAction.first;
+        leastVisitedAction = leastStateAction.second;
+      }
+
+      runSimulation = stateActionCounts.get(leastVisitedState).get(leastVisitedAction) < requiredSamples;
+    }
+  }
+
+  private Pair<Integer, Integer> getLeastVisitedStateAction(Mec mec) {
+    long minValue = Long.MAX_VALUE;
+    int minVisitedState = -1;
+    int minVisitedAction = -1;
+
+    for (int state : mec.states) {
+      for (int action : mec.actions.get(state)) {
+        long counts = getActionCounts(state, action);
+        if (counts < minValue) {
+          minVisitedState = state;
+          minVisitedAction = action;
+        }
+      }
+    }
+
+    return new Pair<>(minVisitedState, minVisitedAction);
+  }
+
+  private Int2ObjectMap<Int2LongMap> getAllStateActionCounts(Mec mec) {
+    Int2ObjectMap<Int2LongMap> stateActionCounts = new Int2ObjectOpenHashMap<>();
+    for (int state : mec.states) {
+      Int2LongMap stateActionCount = new Int2LongOpenHashMap();
+      for (int action : mec.actions.get(state)) {
+        stateActionCount.put(action, getActionCounts(state, action));
+      }
+      stateActionCounts.put(state, stateActionCount);
+    }
+    return stateActionCounts;
   }
 
   /**
