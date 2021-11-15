@@ -13,7 +13,6 @@ import prism.Pair;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 /**
@@ -36,8 +35,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   protected final Int2ObjectMap<ObjectArrayList<Int2LongMap>> stateTransitionCounts = new Int2ObjectOpenHashMap<>();
   // This holds the real set of actions for the model. Successors are sampled using these distributions.
   protected final Int2ObjectMap<ObjectArrayList<Action>> stateActions = new Int2ObjectOpenHashMap<>();
-  // This holds whether the counts of a state-action pair have been changed or not.
-  protected final Int2ObjectMap<Int2BooleanMap> stateActionChange = new Int2ObjectOpenHashMap<>();
 
   // This holds all the actions of the model regardless of whether they pass the actionCountFilter. They are used to
   // restore the original set of actions after deactivateActionCountFilter() is called.
@@ -102,8 +99,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
   /**
    * Updates to actionCountFilter according to mecConfidence and pMin.
-   * @param mecConfidence
-   * @param pMin
    */
   public void updateCountParams(double mecConfidence, double pMin){
     this.actionCountFilter = Math.log(mecConfidence)/Math.log(1-pMin);
@@ -113,24 +108,17 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   /**
    * Update sampled counts for a state-action-successor triplet. If update is true, the learned distributions are
    * immediately updated. Returns whether a new action has been sampled more than actionCountFilter number of times.
-   * @param state
-   * @param actionIndex
-   * @param successor
-   * @param update
    */
-  public boolean updateCounts(int state, int actionIndex, int successor, boolean update){
+  public boolean updateCounts(int state, int actionIndex, int successor){
     int originalActionIndex;
-    if (actionCountFilterActive) {
-      originalActionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
-    } else {
-      originalActionIndex = actionIndex;
-    }
-    Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(originalActionIndex);
-    transitionCounts.put(successor, transitionCounts.getOrDefault(successor, 0)+1);
+    originalActionIndex = actionCountFilterActive ? unfilteredActionIndexMap.get(state).get(actionIndex) : actionIndex;
+
+    long newTransitionCount = incrementTransitionCount(state, originalActionIndex, successor);
+    updateStateActionDistributionInModel(state, actionIndex, originalActionIndex);
 
     boolean newTrans = false;
 
-    if (transitionCounts.get(successor)==1){
+    if (newTransitionCount == 1){
       numTrans++;
     }
 
@@ -139,24 +127,10 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       newTrans = true;
     }
 
-    if (update) {
-      List<Action> currActions = model.getActions(state);
-      Action currAction = currActions.get(actionIndex);
-
-      Distribution distribution = getDistributionFromCounts(state, transitionCounts);
-      currActions.set(actionIndex, Action.of(distribution, currAction.label()));
-
-      model.setActions(state, currActions);
-    }
-
-    stateActionChange.get(state).put(originalActionIndex, !update);
-
     return newTrans;
   }
 
   /**
-   * @param stateId
-   * @param actionIndex
    * @return Returns the number of times a state action pair has been sampled.
    */
   public long getActionCounts(int stateId, int actionIndex){
@@ -168,8 +142,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   }
 
   /**
-   * @param stateId
-   * @param transitionCounts
    * @return Returns the distribution of an action for a state from the transitionCounts.
    */
   protected Distribution getDistributionFromCounts(int stateId, Int2LongMap transitionCounts){
@@ -192,51 +164,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     Distribution distribution = skippedAny ? builder.scaled() : builder.build();
     assert distribution.isEmpty() || Util.isOne(distribution.sum()) : distribution;
     return distribution;
-
-  }
-
-  /**
-   * Updates the model according to the latest state-action-successor counts only if changed is satisfied for a state-
-   * action pair.
-   * @param changed
-   */
-  public void updateModel(BiPredicate<Integer, Integer> changed){
-
-    for (int stateId: exploredStates) {
-      List<Action> actionList = new ArrayList<>();
-      for (int actionIndex=0; actionIndex<stateTransitionCounts.get(stateId).size(); actionIndex++){
-        if (actionCountFilterActive) {
-          actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
-        }
-        Action action = model.getActions(stateId).get(actionIndex);
-        if (changed.test(stateId, actionIndex)) {
-
-          Int2LongMap transitionCounts = stateTransitionCounts.get(stateId).get(actionIndex);
-          Distribution distribution = getDistributionFromCounts(stateId, transitionCounts);
-          action = Action.of(distribution, action.label());
-        }
-        actionList.add(action);
-      }
-      model.setActions(stateId, actionList);
-    }
-
-  }
-
-  /**
-   * Updates to model counts of the entire model according to the latest state-action-successor counts.
-   */
-  public void updateModelCounts(){
-
-    updateModel((stateId, actionIndex) -> stateActionChange.get((int) stateId).get((int) actionIndex));
-
-    for (int stateId: stateActionChange.keySet()){
-      for (int actionIndex=0; actionIndex<stateActionChange.size(); actionIndex++) {
-        if (actionCountFilterActive) {
-          actionIndex = unfilteredActionIndexMap.get(stateId).get(actionIndex);
-        }
-        stateActionChange.get(stateId).put(actionIndex, false);
-      }
-    }
 
   }
 
@@ -281,7 +208,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
     stateTransitionCounts.put(stateId, stateActionCounts);
     stateActions.put(stateId, stateChoices);
-    stateActionChange.put(stateId, new Int2BooleanOpenHashMap());
 
     exploredActionsCount += stateChoices.size();
 
@@ -290,7 +216,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
   /**
    * Uniformly samples an action from the model choices.
-   * @param stateId
    * @return Returns the index of the sampled action corresponding to the choices in the model variable.
    */
   public int sampleNextAction(int stateId){
@@ -303,7 +228,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
   /**
    * Samples a successor state from the distribution of the action.
-   * @param stateId
    * @param actionIndex: index of the action corresponding to the model variable.
    * @return StateID of the sampled successor state.
    */
@@ -377,7 +301,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       int actionIndex = intActions.get(random.nextInt(actions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
-      updateCounts(currentState, actionIndex, successor, true);
+      updateCounts(currentState, actionIndex, successor);
       currentState = successor;
       simulationCount++;
     }
@@ -390,13 +314,12 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   public void simulateMECRepeatedly3(Mec mec, double requiredSamples) {
     int currentState = mec.states.firstInt();
     Random random = new Random();
-    Int2ObjectMap<Int2LongMap> stateActionCounts = getAllStateActionCounts(mec);
 
     Pair<Integer, Integer> leastStateAction = getLeastVisitedStateAction(mec);
     int leastVisitedState = leastStateAction.first;
     int leastVisitedAction = leastStateAction.second;
 
-    boolean runSimulation = stateActionCounts.get(leastVisitedState).get(leastVisitedAction) < requiredSamples;
+    boolean runSimulation = getActionCounts(leastVisitedState, leastVisitedAction) < requiredSamples;
 
     while (runSimulation) {
       IntSet actions = mec.actions.get(currentState);
@@ -404,16 +327,19 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       int actionIndex = intActions.get(random.nextInt(actions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
-      updateCounts(currentState, actionIndex, successor, true);
+      updateCounts(currentState, actionIndex, successor);
       currentState = successor;
 
-      if (stateActionCounts.get(leastVisitedState).get(leastVisitedAction) >= requiredSamples) {
+      long leastStateActionCounts = getActionCounts(leastVisitedState, leastVisitedAction);
+
+      if (leastStateActionCounts >= requiredSamples) {
         leastStateAction = getLeastVisitedStateAction(mec);
         leastVisitedState = leastStateAction.first;
         leastVisitedAction = leastStateAction.second;
+        leastStateActionCounts = getActionCounts(leastVisitedState, leastVisitedAction);
       }
 
-      runSimulation = stateActionCounts.get(leastVisitedState).get(leastVisitedAction) < requiredSamples;
+      runSimulation = leastStateActionCounts < requiredSamples;
     }
   }
 
@@ -435,21 +361,11 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     return new Pair<>(minVisitedState, minVisitedAction);
   }
 
-  private Int2ObjectMap<Int2LongMap> getAllStateActionCounts(Mec mec) {
-    Int2ObjectMap<Int2LongMap> stateActionCounts = new Int2ObjectOpenHashMap<>();
-    for (int state : mec.states) {
-      Int2LongMap stateActionCount = new Int2LongOpenHashMap();
-      for (int action : mec.actions.get(state)) {
-        stateActionCount.put(action, getActionCounts(state, action));
-      }
-      stateActionCounts.put(state, stateActionCount);
-    }
-    return stateActionCounts;
-  }
-
   /**
    * Activates the action count filter. Updates the model variable to hold only those actions that pass the actionCountFilter.
    * Caches to original action for later use.
+   *
+   * For grey box, we only keep actions that has all of its successors visited
    */
   public void activateActionCountFilter(){
 
@@ -508,7 +424,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   /**
    * Returns a list of distributions of the corresponding actions for a state. If actionCountFilter is active, only
    * those actions' distributions are added which have been sampled more than actionCountFilter number of times.
-   * @param stateId
    * @return a list of distributions of choices.
    */
   @Override
@@ -521,7 +436,6 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   /**
    * Returns a list of actions for a state. If actionCountFilter is active, only those actions are added which have been
    * sampled more than actionCountFilter number of times. unfilteredActionIndexMap is also populated.
-   * @param stateId
    * @return a list of actions.
    */
   @Override
@@ -555,5 +469,25 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   public String toString() {
     return String.format("DefaultExplorer(%s, %s, %s)", model.getClass(), generator,
             removeSelfLoops ? "inline" : "normal");
+  }
+
+  private long incrementTransitionCount(int state, int actionIndex, int successor) {
+    Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
+
+    long newTransitionCount = transitionCounts.getOrDefault(successor, 0) + 1;
+    transitionCounts.put(successor, newTransitionCount);
+    return newTransitionCount;
+  }
+
+  private void updateStateActionDistributionInModel(int state, int actionIndex, int originalActionIndex) {
+    Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(originalActionIndex);
+
+    List<Action> currActions = model.getActions(state);
+    Action currAction = currActions.get(actionIndex);
+
+    Distribution distribution = getDistributionFromCounts(state, transitionCounts);
+    currActions.set(actionIndex, Action.of(distribution, currAction.label()));
+
+    model.setActions(state, currActions);
   }
 }
