@@ -2,6 +2,7 @@ package de.tum.in.probmodels.explorer;
 
 import de.tum.in.probmodels.generator.Choice;
 import de.tum.in.probmodels.generator.Generator;
+import de.tum.in.probmodels.graph.Mec;
 import de.tum.in.probmodels.model.*;
 import de.tum.in.probmodels.util.Sample;
 import de.tum.in.probmodels.util.Util;
@@ -10,7 +11,9 @@ import it.unimi.dsi.fastutil.objects.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
 
 /**
  * Class to facilitate black box exploration. It keeps hold of counts for how many times each state-action-triplet is
@@ -115,10 +118,13 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    * @param update
    */
   public boolean updateCounts(int state, int actionIndex, int successor, boolean update){
+    int originalActionIndex;
     if (actionCountFilterActive) {
-      actionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
+      originalActionIndex = unfilteredActionIndexMap.get(state).get(actionIndex);
+    } else {
+      originalActionIndex = actionIndex;
     }
-    Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(actionIndex);
+    Int2LongMap transitionCounts = stateTransitionCounts.get(state).get(originalActionIndex);
     transitionCounts.put(successor, transitionCounts.getOrDefault(successor, 0)+1);
 
     boolean newTrans = false;
@@ -142,7 +148,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       model.setActions(state, currActions);
     }
 
-    stateActionChange.get(state).put(actionIndex, !update);
+    stateActionChange.get(state).put(originalActionIndex, !update);
 
     return newTrans;
   }
@@ -334,6 +340,35 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     currActions.set(filteredIndex, Action.of(distribution, action.label()));
 
     model.setActions(stateId, currActions);
+  }
+
+  public void simulateRepeatedly(Mec mec, double requiredSamples) {
+    for(int state: mec.actions.keySet()) {
+      for(int actionInd: mec.actions.get(state)) {
+        if (model().getChoice(state, actionInd).size()<2) {
+          continue;
+        }
+        simulateActionRepeatedly(state, actionInd, requiredSamples);
+      }
+    }
+  }
+
+  public void simulateMECRepeatedly(Mec mec, double requiredSamples, double nTransitions) {
+    double nSimulations = Math.min(1e8, requiredSamples * nTransitions);
+
+    int simulationCount = 0;
+    int currentState = mec.states.firstInt();
+    Random random = new Random();
+
+    while (simulationCount < nSimulations) {
+      IntSet actions = mec.actions.get(currentState);
+      List<Integer> intActions = actions.stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
+      int actionIndex = intActions.get(random.nextInt(actions.size()));
+      int successor = stateActions.get(currentState).get(actionIndex).distribution().sample();
+      updateCounts(currentState, actionIndex, successor, true);
+      currentState = successor;
+      simulationCount++;
+    }
   }
 
   /**
