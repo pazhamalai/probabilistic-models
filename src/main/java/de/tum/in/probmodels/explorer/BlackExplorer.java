@@ -308,7 +308,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   }
 
   /**
-   * We simulate MEC, until all the state-action pairs has been visited requiredSample number of times. Actions are
+   * We simulate MEC truly, until all the state-action pairs has been visited requiredSample number of times. Actions are
    * chosen randomly.
    */
   public void simulateMECRepeatedly3(Mec mec, double requiredSamples) {
