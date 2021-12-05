@@ -288,22 +288,40 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    *
    * Actions are chosen in random.
    */
-  public void simulateMECRepeatedly2(Mec mec, double requiredSamples, double nTransitions) {
+  public void simulateMECRepeatedly2(Mec mec, double requiredSamples, int nTransitions) {
+    // If there is only one transition in the MEC then no need to simulate
+    if (nTransitions <= 1) {
+      return;
+    }
     double nSimulations = Math.min(1e8, requiredSamples * nTransitions);
+
+    // Actions stored in Mec are of type set. To choose a random element, we convert them to list actions and pick
+    // random elements from them.
+    Int2ObjectMap<List<Integer>> listActions = new Int2ObjectOpenHashMap<>(mec.states.size());
+    for (int state : mec.states) {
+      List<Integer> stateActionsList = mec.actions.get(state).stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
+      listActions.put(state, stateActionsList);
+    }
 
     int simulationCount = 0;
     int currentState = mec.states.firstInt();
     Random random = new Random();
 
     while (simulationCount < nSimulations) {
-      IntSet actions = mec.actions.get(currentState);
-      List<Integer> intActions = actions.stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
-      int actionIndex = intActions.get(random.nextInt(actions.size()));
+      List<Integer> intActions = listActions.get(currentState);
+      int actionIndex = intActions.get(random.nextInt(intActions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
-      updateCounts(currentState, actionIndex, successor);
+      incrementTransitionCount(currentState, originalActionIndex, successor);
       currentState = successor;
       simulationCount++;
+    }
+
+    for (int state : mec.states) {
+      for (int action : mec.actions.get(state)) {
+        int originalActionIndex = unfilteredActionIndexMap.get(state).get(action);
+        updateStateActionDistributionInModel(state, action, originalActionIndex);
+      }
     }
   }
 
@@ -311,7 +329,20 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
    * We simulate MEC truly, until all the state-action pairs has been visited requiredSample number of times. Actions are
    * chosen randomly.
    */
-  public void simulateMECRepeatedly3(Mec mec, double requiredSamples) {
+  public void simulateMECRepeatedly3(Mec mec, double requiredSamples, int nTransitions) {
+    // If there is only one transition in the MEC, then no need for simulation
+    if (nTransitions <= 1) {
+      return;
+    }
+
+    // Actions stored in Mec are of type set. To choose a random element, we convert them to list actions and pick
+    // random elements from them.
+    Int2ObjectMap<List<Integer>> listActions = new Int2ObjectOpenHashMap<>(mec.states.size());
+    for (int state : mec.states) {
+      List<Integer> stateActionsList = mec.actions.get(state).stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
+      listActions.put(state, stateActionsList);
+    }
+
     int currentState = mec.states.firstInt();
     Random random = new Random();
 
@@ -319,15 +350,15 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     int leastVisitedState = leastStateAction.first;
     int leastVisitedAction = leastStateAction.second;
 
+    // We terminate the simulation if lest visited state action pair in Mec is at least visited requiredSamples number of times
     boolean runSimulation = getActionCounts(leastVisitedState, leastVisitedAction) < requiredSamples;
 
     while (runSimulation) {
-      IntSet actions = mec.actions.get(currentState);
-      List<Integer> intActions = actions.stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
-      int actionIndex = intActions.get(random.nextInt(actions.size()));
+      List<Integer> intActions = listActions.get(currentState).stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
+      int actionIndex = intActions.get(random.nextInt(intActions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
-      updateCounts(currentState, actionIndex, successor);
+      incrementTransitionCount(currentState, originalActionIndex, successor);
       currentState = successor;
 
       long leastStateActionCounts = getActionCounts(leastVisitedState, leastVisitedAction);
@@ -340,6 +371,14 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       }
 
       runSimulation = leastStateActionCounts < requiredSamples;
+    }
+
+    // We update the distribution as per the counts
+    for (int state : mec.states) {
+      for (int action : mec.actions.get(state)) {
+        int originalActionIndex = unfilteredActionIndexMap.get(state).get(action);
+        updateStateActionDistributionInModel(state, action, originalActionIndex);
+      }
     }
   }
 
