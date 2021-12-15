@@ -10,15 +10,16 @@ public class Explorers {
   }
 
   public static <S, M extends Model> Explorer<S, M> getExplorer(M partialModel, Generator<S> generator,
-                                                                InformationLevel informationLevel, boolean removeSelfLoops){
+                                                                InformationLevel informationLevel, boolean removeSelfLoops,
+                                                                long timeout){
     if (informationLevel==InformationLevel.BLACKBOX){
-      return BlackExplorer.of(partialModel, generator, removeSelfLoops);
+      return BlackExplorer.of(partialModel, generator, removeSelfLoops, timeout);
     }
     else if (informationLevel==InformationLevel.WHITEBOX){
       return DefaultExplorer.of(partialModel, generator, removeSelfLoops);
     }
     else {
-      return GreyExplorer.of(partialModel, generator, removeSelfLoops);
+      return GreyExplorer.of(partialModel, generator, removeSelfLoops, timeout);
     }
   }
 }

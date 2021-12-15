@@ -29,6 +29,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
   protected final M model;
   protected final Generator<S> generator;
   protected final boolean removeSelfLoops;
+  protected final long timeout;
 
   // This holds the counts for haw many times every state-action-successor triplet has been sampled. They can be accessed
   // by first using the stateIndex and then the actionIndex as keys.
@@ -61,8 +62,8 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
 
   // Creates and returns a default explorer object from a generator. Explores all initial states
   public static <S, M extends Model> BlackExplorer<S, M> of(M model, Generator<S> generator,
-      boolean removeSelfLoops) {
-    BlackExplorer<S, M> explorer = new BlackExplorer<>(model, generator, removeSelfLoops);
+      boolean removeSelfLoops, long timeout) {
+    BlackExplorer<S, M> explorer = new BlackExplorer<>(model, generator, removeSelfLoops, timeout);
     IntList initialStateIds = new IntArrayList();
     for (S initialState : generator.initialStates()) {
       int stateId = explorer.getStateId(initialState);
@@ -73,10 +74,11 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     return explorer;
   }
 
-  BlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops) {
+  BlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
     this.model = model;
     this.generator = generator;
     this.removeSelfLoops = removeSelfLoops;
+    this.timeout = timeout;
   }
 
   @Override
@@ -307,22 +309,17 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     int currentState = mec.states.firstInt();
     Random random = new Random();
 
-    while (simulationCount < nSimulations) {
+    while (simulationCount < nSimulations && !isTimeout()) {
       List<Integer> intActions = listActions.get(currentState);
       int actionIndex = intActions.get(random.nextInt(intActions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
-      incrementTransitionCount(currentState, originalActionIndex, successor);
+      onSimulationStep(currentState, actionIndex, originalActionIndex, successor);
       currentState = successor;
       simulationCount++;
     }
 
-    for (int state : mec.states) {
-      for (int action : mec.actions.get(state)) {
-        int originalActionIndex = unfilteredActionIndexMap.get(state).get(action);
-        updateStateActionDistributionInModel(state, action, originalActionIndex);
-      }
-    }
+    onSimulationEnded(mec);
   }
 
   /**
@@ -353,12 +350,12 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     // We terminate the simulation if lest visited state action pair in Mec is at least visited requiredSamples number of times
     boolean runSimulation = getActionCounts(leastVisitedState, leastVisitedAction) < requiredSamples;
 
-    while (runSimulation) {
+    while (runSimulation && !isTimeout()) {
       List<Integer> intActions = listActions.get(currentState).stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
       int actionIndex = intActions.get(random.nextInt(intActions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
-      incrementTransitionCount(currentState, originalActionIndex, successor);
+      onSimulationStep(currentState, actionIndex, originalActionIndex, successor);
       currentState = successor;
 
       long leastStateActionCounts = getActionCounts(leastVisitedState, leastVisitedAction);
@@ -373,6 +370,14 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       runSimulation = leastStateActionCounts < requiredSamples;
     }
 
+    onSimulationEnded(mec);
+  }
+
+  protected void onSimulationStep(int state, int actionIndex, int originalActionIndex, int successor) {
+    incrementTransitionCount(state, originalActionIndex, successor);
+  }
+
+  protected void onSimulationEnded(Mec mec) {
     // We update the distribution as per the counts
     for (int state : mec.states) {
       for (int action : mec.actions.get(state)) {
@@ -528,5 +533,9 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     currActions.set(actionIndex, Action.of(distribution, currAction.label()));
 
     model.setActions(state, currActions);
+  }
+
+  protected boolean isTimeout() {
+    return System.currentTimeMillis() >= timeout;
   }
 }

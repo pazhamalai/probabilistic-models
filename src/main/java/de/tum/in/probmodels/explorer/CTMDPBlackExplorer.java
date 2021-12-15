@@ -19,8 +19,8 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
   public final Int2ObjectMap<Int2ObjectMap<Pair<Double, Integer>>> transitionTimes = new Int2ObjectOpenHashMap<>();
 
   public static <S, M extends Model> CTMDPBlackExplorer<S, M> of(M model, Generator<S> generator,
-                                                                 boolean removeSelfLoops) {
-    CTMDPBlackExplorer<S, M> explorer = new CTMDPBlackExplorer<>(model, generator, removeSelfLoops);
+                                                                 boolean removeSelfLoops, long timeout) {
+    CTMDPBlackExplorer<S, M> explorer = new CTMDPBlackExplorer<>(model, generator, removeSelfLoops, timeout);
     IntList initialStateIds = new IntArrayList();
     for (S initialState : generator.initialStates()) {
       int stateId = explorer.getStateId(initialState);
@@ -31,8 +31,8 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     return explorer;
   }
 
-  CTMDPBlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops) {
-    super(model, generator, removeSelfLoops);
+  CTMDPBlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
+    super(model, generator, removeSelfLoops, timeout);
   }
 
   @Override
@@ -73,10 +73,14 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       model.setActions(state, currActions);
     }
 
-    double stayTime = Sample.sampleExponential(stateTransitionRates.get(state).get(actionIndex).values().stream().reduce(0d, Double::sum));
+    double stayTime = getStayTime(state, actionIndex);
     accumulateStayTime(state, actionIndex, stayTime);
 
     return newTrans;
+  }
+
+  private double getStayTime(int state, int actionIndex) {
+    return Sample.sampleExponential(stateTransitionRates.get(state).get(actionIndex).values().stream().reduce(0d, Double::sum));
   }
 
   private void accumulateStayTime(int state, int actionIndex, double stayTime) {
@@ -105,7 +109,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     while (actionCounts<requiredSamples) {
       int succ = action.distribution().sample();
       actionTransitionCounts.put(succ, actionTransitionCounts.get(succ)+1);
-      double stayTime = Sample.sampleExponential(stateTransitionRates.get(stateId).get(realIndex).get(succ));
+      double stayTime = getStayTime(stateId, realIndex);
       accumulateStayTime(stateId, realIndex, stayTime);
       actionCounts++;
     }
@@ -119,6 +123,14 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     currActions.set(filteredIndex, Action.of(distribution, action.label()));
 
     model.setActions(stateId, currActions);
+  }
+
+  @Override
+  protected void onSimulationStep(int state, int actionIndex, int originalActionIndex, int successor) {
+    super.onSimulationStep(state, actionIndex, originalActionIndex, successor);
+
+    double stayTime = getStayTime(state, originalActionIndex);
+    accumulateStayTime(state, originalActionIndex, stayTime);
   }
 
   @Override

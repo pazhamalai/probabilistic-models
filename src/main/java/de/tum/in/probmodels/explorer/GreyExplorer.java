@@ -12,8 +12,8 @@ public class GreyExplorer<S, M extends Model> extends BlackExplorer<S, M> {
     // When a (state, action) pair is fully explored, this boolean is set to true
     private boolean isNewFullyExploredActionAvailable = false;
 
-    GreyExplorer(M model, Generator<S> generator, boolean removeSelfLoops) {
-        super(model, generator, removeSelfLoops);
+    GreyExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
+        super(model, generator, removeSelfLoops, timeout);
     }
 
     /**
