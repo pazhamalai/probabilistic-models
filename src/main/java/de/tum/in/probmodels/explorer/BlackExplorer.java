@@ -351,7 +351,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     boolean runSimulation = getActionCounts(leastVisitedState, leastVisitedAction) < requiredSamples;
 
     while (runSimulation && !isTimeout()) {
-      List<Integer> intActions = listActions.get(currentState).stream().mapToInt(x -> x).boxed().collect(Collectors.toList());
+      List<Integer> intActions = listActions.get(currentState);
       int actionIndex = intActions.get(random.nextInt(intActions.size()));
       int originalActionIndex = unfilteredActionIndexMap.get(currentState).get(actionIndex);
       int successor = stateActions.get(currentState).get(originalActionIndex).distribution().sample();
