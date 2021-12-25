@@ -13,13 +13,13 @@ public class Explorers {
                                                                 InformationLevel informationLevel, boolean removeSelfLoops,
                                                                 long timeout){
     if (informationLevel==InformationLevel.BLACKBOX){
-      return BlackExplorer.of(partialModel, generator, removeSelfLoops, timeout);
+      return new BlackExplorer<>(partialModel, generator, removeSelfLoops, timeout);
     }
     else if (informationLevel==InformationLevel.WHITEBOX){
       return DefaultExplorer.of(partialModel, generator, removeSelfLoops);
     }
     else {
-      return GreyExplorer.of(partialModel, generator, removeSelfLoops, timeout);
+      return new GreyExplorer<>(partialModel, generator, removeSelfLoops, timeout);
     }
   }
 }

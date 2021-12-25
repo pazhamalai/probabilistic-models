@@ -60,25 +60,19 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     return stateActions;
   }
 
-  // Creates and returns a default explorer object from a generator. Explores all initial states
-  public static <S, M extends Model> BlackExplorer<S, M> of(M model, Generator<S> generator,
-      boolean removeSelfLoops, long timeout) {
-    BlackExplorer<S, M> explorer = new BlackExplorer<>(model, generator, removeSelfLoops, timeout);
-    IntList initialStateIds = new IntArrayList();
-    for (S initialState : generator.initialStates()) {
-      int stateId = explorer.getStateId(initialState);
-      explorer.exploreState(stateId);
-      initialStateIds.add(stateId);
-    }
-    model.setInitialStates(initialStateIds);
-    return explorer;
-  }
-
   BlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
     this.model = model;
     this.generator = generator;
     this.removeSelfLoops = removeSelfLoops;
     this.timeout = timeout;
+
+    IntList initialStateIds = new IntArrayList();
+    for (S initialState : generator.initialStates()) {
+      int stateId = getStateId(initialState);
+      exploreState(stateId);
+      initialStateIds.add(stateId);
+    }
+    model.setInitialStates(initialStateIds);
   }
 
   @Override
