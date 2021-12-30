@@ -381,7 +381,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     }
   }
 
-  private Pair<Integer, Integer> getLeastVisitedStateAction(Mec mec) {
+  public Pair<Integer, Integer> getLeastVisitedStateAction(Mec mec) {
     long minValue = Long.MAX_VALUE;
     int minVisitedState = -1;
     int minVisitedAction = -1;
