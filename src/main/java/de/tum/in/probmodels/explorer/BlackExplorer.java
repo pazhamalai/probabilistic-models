@@ -66,6 +66,7 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
     this.removeSelfLoops = removeSelfLoops;
     this.timeout = timeout;
 
+    initializeVars();
     IntList initialStateIds = new IntArrayList();
     for (S initialState : generator.initialStates()) {
       int stateId = getStateId(initialState);
@@ -73,6 +74,10 @@ public class BlackExplorer<S, M extends Model> implements Explorer<S, M>{
       initialStateIds.add(stateId);
     }
     model.setInitialStates(initialStateIds);
+  }
+
+  protected void initializeVars() {
+
   }
 
   @Override

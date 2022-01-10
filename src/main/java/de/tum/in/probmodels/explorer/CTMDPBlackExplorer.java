@@ -14,25 +14,19 @@ import java.util.List;
 
 public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
 
-  private final Int2ObjectMap<ObjectArrayList<Int2DoubleMap>> stateTransitionRates = new Int2ObjectOpenHashMap<>();
+  private Int2ObjectMap<ObjectArrayList<Int2DoubleMap>> stateTransitionRates;
 
-  public final Int2ObjectMap<Int2ObjectMap<Pair<Double, Integer>>> transitionTimes = new Int2ObjectOpenHashMap<>();
+  public Int2ObjectMap<Int2ObjectMap<Pair<Double, Integer>>> transitionTimes;
 
-  public static <S, M extends Model> CTMDPBlackExplorer<S, M> of(M model, Generator<S> generator,
-                                                                 boolean removeSelfLoops, long timeout) {
-    CTMDPBlackExplorer<S, M> explorer = new CTMDPBlackExplorer<>(model, generator, removeSelfLoops, timeout);
-    IntList initialStateIds = new IntArrayList();
-    for (S initialState : generator.initialStates()) {
-      int stateId = explorer.getStateId(initialState);
-      explorer.exploreState(stateId);
-      initialStateIds.add(stateId);
-    }
-    model.setInitialStates(initialStateIds);
-    return explorer;
+  public CTMDPBlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
+    super(model, generator, removeSelfLoops, timeout);
   }
 
-  CTMDPBlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
-    super(model, generator, removeSelfLoops, timeout);
+  @Override
+  protected void initializeVars() {
+    super.initializeVars();
+    transitionTimes = new Int2ObjectOpenHashMap<>();
+    stateTransitionRates = new Int2ObjectOpenHashMap<>();
   }
 
   @Override
@@ -192,5 +186,18 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     exploredActionsCount += stateChoices.size();
 
     return state;
+  }
+
+  public double computeRate(int state, int action) {
+    int originalActionIndex = action;
+    if (actionCountFilterActive) {
+      originalActionIndex = unfilteredActionIndexMap.get(state).get(action);
+    }
+
+    Pair<Double, Integer> transitionTimesPair = transitionTimes.get(state).get(originalActionIndex);
+    int numStayTimes = transitionTimesPair.second;
+    double accumulatedStayTimes = transitionTimesPair.first;
+
+    return numStayTimes / accumulatedStayTimes;
   }
 }
