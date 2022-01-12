@@ -16,7 +16,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
 
   private Int2ObjectMap<ObjectArrayList<Int2DoubleMap>> stateTransitionRates;
 
-  public Int2ObjectMap<Int2ObjectMap<Pair<Double, Integer>>> transitionTimes;
+  public Int2ObjectMap<Int2ObjectMap<Pair<Double, Long>>> transitionTimes;
 
   public CTMDPBlackExplorer(M model, Generator<S> generator, boolean removeSelfLoops, long timeout) {
     super(model, generator, removeSelfLoops, timeout);
@@ -78,11 +78,15 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
   }
 
   private void accumulateStayTime(int state, int actionIndex, double stayTime) {
-    Pair<Double, Integer> transitionTimePair = transitionTimes.get(state).get(actionIndex);
+    Pair<Double, Long> transitionTimePair = transitionTimes.get(state).get(actionIndex);
     double accumulatedStayTime = transitionTimePair.first;
-    int stayTimeCount = transitionTimePair.second;
+    long stayTimeCount = transitionTimePair.second;
     accumulatedStayTime += stayTime;
-    stayTimeCount++;
+
+    // To prevent overflow
+    if (stayTimeCount < Long.MAX_VALUE) {
+      stayTimeCount++;
+    }
 
     transitionTimePair.first = accumulatedStayTime;
     transitionTimePair.second = stayTimeCount;
@@ -139,7 +143,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
     ObjectArrayList<Int2LongMap> stateActionCounts = new ObjectArrayList<>();
     ObjectArrayList<Action> stateChoices = new ObjectArrayList<>();
 
-    Int2ObjectMap<Pair<Double, Integer>> stateTransitionTimes = new Int2ObjectOpenHashMap<>();
+    Int2ObjectMap<Pair<Double, Long>> stateTransitionTimes = new Int2ObjectOpenHashMap<>();
     ObjectArrayList<Int2DoubleMap> stateTransitionRates = new ObjectArrayList<>();
 
     int actionCount = -1;
@@ -162,7 +166,7 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
         builder.add(target, rate/rateSum);
       }
 
-      stateTransitionTimes.put(actionCount, new Pair<>(0d, 0));
+      stateTransitionTimes.put(actionCount, new Pair<>(0d, 0L));
       // scale the distribution if any values in the original support were skipped
       Distribution distribution = builder.scaled();
       assert distribution.isEmpty() || Util.isOne(distribution.sum()) : distribution;
@@ -194,8 +198,8 @@ public class CTMDPBlackExplorer<S, M extends Model> extends BlackExplorer<S, M>{
       originalActionIndex = unfilteredActionIndexMap.get(state).get(action);
     }
 
-    Pair<Double, Integer> transitionTimesPair = transitionTimes.get(state).get(originalActionIndex);
-    int numStayTimes = transitionTimesPair.second;
+    Pair<Double, Long> transitionTimesPair = transitionTimes.get(state).get(originalActionIndex);
+    long numStayTimes = transitionTimesPair.second;
     double accumulatedStayTimes = transitionTimesPair.first;
 
     return numStayTimes / accumulatedStayTimes;
